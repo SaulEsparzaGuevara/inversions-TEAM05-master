@@ -14,13 +14,14 @@ institutionalAnalysisRouter.use(authContextMiddleware);
 
 institutionalAnalysisRouter.get("/analysis", async (req, res) => {
   try {
-    const { engine, trendEngine } = getInstitutionalRouteContext();
+    const { engine, trendEngine, expirationEngine } = getInstitutionalRouteContext();
     const analysis = buildInstitutionalAnalysisContractFromRequest(req);
 
-    // Execute both analyses in parallel
-    const [zoneResult, trendResult] = await Promise.all([
+    // Execute all three analyses in parallel
+    const [zoneResult, trendResult, expirationResult] = await Promise.all([
       engine.analyze({ analysis }),
-      trendEngine.analyze({ analysis })
+      trendEngine.analyze({ analysis }),
+      expirationEngine.analyze({ analysis })
     ]);
 
     const groupedZones = groupInstitutionalZones(zoneResult.zones);
@@ -44,6 +45,13 @@ institutionalAnalysisRouter.get("/analysis", async (req, res) => {
         resistanceLevel: trendResult.resistanceLevel,
         volumeCorrelation: trendResult.volumeCorrelation,
         continuityProbability: trendResult.continuityProbability
+      },
+      expiration: {
+        events: expirationResult.expirationEvents,
+        slipperySlope: expirationResult.slipperySlope,
+        catalystWindows: expirationResult.catalystWindows,
+        timeDecay: expirationResult.timeDecay,
+        quarterlyCorrelation: expirationResult.quarterlyCorrelation
       },
       metrics: buildInstitutionalMetricsSummary(zoneResult),
       sourceReports: zoneResult.sourceReports,

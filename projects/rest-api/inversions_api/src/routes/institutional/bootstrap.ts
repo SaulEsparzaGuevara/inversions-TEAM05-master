@@ -28,6 +28,10 @@ import {
   type InstitutionalTrendResult
 } from "../../modules/institutional/institutionalTrendEngine.js";
 import {
+  ExpirationAnalysisEngine,
+  type ExpirationAnalysisResult
+} from "../../modules/institutional/expirationAnalysisEngine.js";
+import {
   parseSecEdgar13fReal,
   parseFinraShortInterestReal,
   ensureFinraCache
@@ -37,6 +41,7 @@ type InstitutionalRouteContext = {
   service: InstitutionalDataService;
   engine: InstitutionalZonesEngine;
   trendEngine: InstitutionalTrendEngine;
+  expirationEngine: ExpirationAnalysisEngine;
 };
 
 type InstitutionalTrendSummary = {
@@ -114,7 +119,14 @@ export function getInstitutionalRouteContext(): InstitutionalRouteContext {
     volumeLookback: 20
   });
 
-  routeContext = { service, engine, trendEngine };
+  const expirationEngine = new ExpirationAnalysisEngine({
+    institutionalDataService: service,
+    defaultWindowDays: 90,
+    lookAheadMonths: 6,
+    strikeProximityPct: 0.05
+  });
+
+  routeContext = { service, engine, trendEngine, expirationEngine };
 
   // Eager background preload — does NOT block the return
   ensureFinraCache().catch(() => {});
