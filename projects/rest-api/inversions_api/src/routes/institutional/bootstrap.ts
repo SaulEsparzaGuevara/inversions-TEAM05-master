@@ -106,7 +106,7 @@ export function getInstitutionalRouteContext(): InstitutionalRouteContext {
 
   const service = new InstitutionalDataService({
     sources: defaultSourceConfigs,
-    fetchImpl: createMixedFetch()
+    fetchImpl: globalThis.fetch as FetchLike
   });
 
   const engine = new InstitutionalZonesEngine({
@@ -328,119 +328,6 @@ function buildDefaultSourceConfigs(): InstitutionalSourceConfig[] {
       parser: parseYahooInstitutional
     }
   ];
-}
-
-function createMixedFetch(): FetchLike {
-  const mockFetch = createMockInstitutionalFetch();
-  const nativeFetch = globalThis.fetch;
-
-  return async (input: string, init) => {
-    if (input.includes("institutional.mock")) {
-      return mockFetch(input, init);
-    }
-    return nativeFetch(input, init as Record<string, unknown>) as ReturnType<FetchLike>;
-  };
-}
-
-function createMockInstitutionalFetch(): FetchLike {
-  return async (input: string) => {
-    const url = new URL(input);
-    const ticker = normalizeTicker(url.searchParams.get("ticker") ?? "SPY");
-    const period = normalizePeriod(url.searchParams.get("period") ?? "daily");
-    const horizon = normalizeHorizon(url.searchParams.get("horizon") ?? "medium");
-    const payload = buildMockPayload(url.pathname, ticker, period, horizon);
-
-    return {
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      headers: {
-        get: () => null
-      },
-      async json(): Promise<unknown> {
-        return payload;
-      },
-      async text(): Promise<string> {
-        return JSON.stringify(payload);
-      }
-    };
-  };
-}
-
-function buildMockPayload(
-  path: string,
-  ticker: string,
-  period: InstitutionalAnalysisPeriod,
-  horizon: InstitutionalHorizon
-): Record<string, unknown> {
-  const seed = buildTickerSeed(ticker);
-  const periodFactor = getPeriodFactor(period);
-  const horizonFactor = getHorizonFactor(horizon);
-  const baseVolume = Math.round(650_000 + seed * 720 * periodFactor * horizonFactor);
-  const asOf = new Date().toISOString();
-
-  if (path.includes("sec-edgar-13f")) {
-    const holdingsCount = Math.max(1, Math.round(10 + seed / 9 + horizonFactor * 5));
-    return {
-      ticker,
-      holdingsCount,
-      fundsOwnershipPct: Number(Math.min(96, 20 + (seed % 30) + horizonFactor * 3).toFixed(2)),
-      volume: baseVolume,
-      inflows: Number((baseVolume * 0.44).toFixed(2)),
-      outflows: Number((baseVolume * 0.21).toFixed(2)),
-      notional: Number((holdingsCount * 1_200_000 * horizonFactor).toFixed(2)),
-      asOf,
-      period,
-      horizon
-    };
-  }
-
-  if (path.includes("finra-short-interest")) {
-    const shortInterest = Number((baseVolume * (0.08 + (seed % 5) * 0.01)).toFixed(2));
-    return {
-      ticker,
-      shortInterest,
-      avgDailyVolume: baseVolume,
-      fundsOwnershipPct: Number(Math.min(94, 16 + (seed % 26) + periodFactor * 4).toFixed(2)),
-      positions: Math.max(1, Math.round(seed / 12 + periodFactor * 3)),
-      positiveFlow: Number((baseVolume * 0.18).toFixed(2)),
-      notional: Number((shortInterest * 2.3).toFixed(2)),
-      asOf,
-      period,
-      horizon
-    };
-  }
-
-  if (path.includes("unusual-whales")) {
-    const flow = Number((baseVolume * (0.31 + (seed % 4) * 0.02)).toFixed(2));
-    return {
-      ticker,
-      flow,
-      fundsOwnershipPct: Number(Math.min(97, 22 + (seed % 24) + horizonFactor * 5).toFixed(2)),
-      volume: baseVolume,
-      openPositions: Math.max(1, Math.round(seed / 10 + horizonFactor * 4)),
-      bearishFlow: Number((baseVolume * 0.15).toFixed(2)),
-      openInterestNotional: Number((flow * 2.1).toFixed(2)),
-      asOf,
-      period,
-      horizon
-    };
-  }
-
-  const openPositions = Math.max(1, Math.round(seed / 8 + periodFactor * 4));
-  return {
-    ticker,
-    fundsOwnershipPct: Number(Math.min(95, 19 + (seed % 28) + periodFactor * 3).toFixed(2)),
-    volume: baseVolume,
-    openPositions,
-    inflows: Number((baseVolume * 0.38).toFixed(2)),
-    outflows: Number((baseVolume * 0.19).toFixed(2)),
-    notional: Number((openPositions * 1_050_000 * horizonFactor).toFixed(2)),
-    asOf,
-    period,
-    horizon,
-    instOwn: Number(Math.min(95, 19 + (seed % 28) + periodFactor * 3).toFixed(2))
-  };
 }
 
 function normalizeTicker(value: string | string[] | undefined): string {
