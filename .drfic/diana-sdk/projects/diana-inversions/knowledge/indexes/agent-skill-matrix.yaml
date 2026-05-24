@@ -1,0 +1,63 @@
+version: 1.0.0
+project: diana-inversions
+last_updated: 2026-04-28
+
+interoperability:
+  projects_root_radar: .drfic/diana-sdk/projects/knowledge/indexes/projects-knowledge-radar.yaml
+  shared_manifest: .drfic/diana-sdk/sdk/diana/knowledge/indexes/shared-skills-manifest.yaml
+  manifest: .drfic/diana-sdk/projects/diana-inversions/knowledge/indexes/skills-manifest.yaml
+  engine_matrix: .drfic/diana-sdk/projects/diana-inversions/knowledge/indexes/sdd-engine-matrix.yaml
+  modular_skills_dir: .drfic/diana-sdk/projects/diana-inversions/knowledge/skills
+
+agents:
+  diana:
+    PICCOLO:
+      role: spec-writer
+      primary_skills: [009-inv-execution-governance-human-control, 012-inv-compliance-audit-retention, 001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 003-inv-fundamental-analysis, 007-inv-ai-confluence-orchestration]
+      secondary_skills: [004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 011-inv-portfolio-and-performance-analytics]
+    BULMA:
+      role: plan-architect
+      primary_skills: [001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 007-inv-ai-confluence-orchestration, 008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca]
+      secondary_skills: [003-inv-fundamental-analysis, 011-inv-portfolio-and-performance-analytics, 012-inv-compliance-audit-retention]
+    VEGETA:
+      role: canon-reviewer
+      primary_skills: [009-inv-execution-governance-human-control, 012-inv-compliance-audit-retention]
+      secondary_skills: [001-inv-technical-analysis-structure, 003-inv-fundamental-analysis, 004-inv-options-strategy-engine, 007-inv-ai-confluence-orchestration]
+    KRILIN:
+      role: task-generator
+      primary_skills: [002-inv-indicator-signal-logic, 008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics]
+      secondary_skills: [001-inv-technical-analysis-structure, 004-inv-options-strategy-engine, 006-inv-realtime-news-impact, 012-inv-compliance-audit-retention]
+    GOHAN:
+      role: qa-validator
+      primary_skills: [009-inv-execution-governance-human-control, 012-inv-compliance-audit-retention, 008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca]
+      secondary_skills: [001-inv-technical-analysis-structure, 003-inv-fundamental-analysis, 004-inv-options-strategy-engine, 011-inv-portfolio-and-performance-analytics]
+    GOKU:
+      role: copilot
+      primary_skills: [001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 003-inv-fundamental-analysis, 007-inv-ai-confluence-orchestration]
+      secondary_skills: [004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics]
+    TRUNKS:
+      role: evolution-refactor
+      primary_skills: [007-inv-ai-confluence-orchestration, 008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics]
+      secondary_skills: [001-inv-technical-analysis-structure, 003-inv-fundamental-analysis, 004-inv-options-strategy-engine, 012-inv-compliance-audit-retention]
+
+  speckit:
+    speckit.specify:
+      stage: specify
+      required_skills: [009-inv-execution-governance-human-control, 012-inv-compliance-audit-retention, 001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 003-inv-fundamental-analysis, 007-inv-ai-confluence-orchestration]
+    speckit.clarify:
+      stage: clarify
+      required_skills: [001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 003-inv-fundamental-analysis, 004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 007-inv-ai-confluence-orchestration, 012-inv-compliance-audit-retention]
+    speckit.plan:
+      stage: plan
+      required_skills: [001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 007-inv-ai-confluence-orchestration, 008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics]
+    speckit.tasks:
+      stage: tasks
+      required_skills: [008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics, 012-inv-compliance-audit-retention]
+    speckit.implement:
+      stage: implement
+      required_skills: [008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics, 012-inv-compliance-audit-retention]
+
+gating_rules:
+  - rule: "If any required skill is missing from skills-manifest, mark as coverage gap and request /diana.knowledge generation before finalizing stage outputs."
+  - rule: "If skill exists but linked knowledge doc is not complete, use fallback methodology and report exact gap."
+  - rule: "Never block execution if gap exists; degrade gracefully and report recommendations."

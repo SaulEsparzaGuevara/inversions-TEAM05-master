@@ -1,0 +1,33 @@
+{
+  "name": "@inversions/pwa",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "lightweight-charts": "^5.2.0",
+    "lucide-react": "^1.16.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.15.1"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/react-router-dom": "^5.3.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/ui": "^4.1.6",
+    "happy-dom": "^20.9.0",
+    "jsdom": "^22.1.0",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8",
+    "vitest": "^4.1.6"
+  }
+}

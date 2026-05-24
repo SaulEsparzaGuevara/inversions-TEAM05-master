@@ -1,0 +1,177 @@
+version: 1.0.0
+project: diana-inversions
+last_updated: 2026-04-28
+
+naming_convention:
+  id_format: <NNN>-inv-<skill-name-predictivo-en-minusculas>
+  project_code: inv
+  separator: "-"
+  naming_rules:
+    - usar minusculas
+    - usar palabras clave completas cuando no haga el nombre excesivo
+    - evitar abreviaturas opacas
+  migration_note: Reemplaza formato SK-INV-XXX y 00X-DINV-ABREV
+
+storage:
+  mode: hybrid
+  modular_skills_dir: .drfic/diana-sdk/projects/diana-inversions/knowledge/skills
+  engine_matrix: .drfic/diana-sdk/projects/diana-inversions/knowledge/indexes/sdd-engine-matrix.yaml
+  traceability_index: .drfic/diana-sdk/projects/diana-inversions/knowledge/indexes/skills-traceability.md
+
+inheritance:
+  projects_root_radar: .drfic/diana-sdk/projects/knowledge/indexes/projects-knowledge-radar.yaml
+  shared_manifest: .drfic/diana-sdk/sdk/diana/knowledge/indexes/shared-skills-manifest.yaml
+  resolution_order:
+    - projects-root
+    - shared-sdk
+    - project-override
+
+canonical_sources:
+  - .drfic/diana-sdk/projects/diana-inversions/inv-constitution.md
+  - .drfic/diana-sdk/projects/diana-inversions/initiatives/001-inversions/001-inv-spec.md
+  - specs/001-plataforma-inversiones-ia/spec.md
+  - .drfic/diana-sdk/projects/diana-inversions/governance/change-requests/001-inv-ucc.md
+  - .drfic/diana-sdk/projects/diana-inversions/governance/tickets/001-inv-tkt.md
+  - .drfic/diana-sdk/projects/diana-inversions/initiatives/001-inversions/meta.md
+
+skills:
+  - id: 001-inv-technical-analysis-structure
+    name: technical-analysis-structure
+    description: Detect trend, support, resistance, breakout quality, and multi-timeframe consistency.
+    criticality: critical
+    skill_doc: skills/001-inv-technical-analysis-structure.md
+    source_of_truth:
+      - 001-inv-spec.md#2.2
+      - 001-inv-ucc.md#Descripcion del Requerimiento
+    knowledge_docs:
+      - local/cores/001-technical-analysis-core.md
+
+  - id: 002-inv-indicator-signal-logic
+    name: indicator-signal-logic
+    description: Compute indicator state and transform evidence into BUY/SELL/HOLD candidates.
+    criticality: critical
+    skill_doc: skills/002-inv-indicator-signal-logic.md
+    source_of_truth:
+      - 001-inv-ucc.md#Descripcion del Requerimiento
+      - spec.md#FR-001
+    knowledge_docs:
+      - local/cores/003-buy-sell-signals-core.md
+
+  - id: 003-inv-fundamental-analysis
+    name: fundamental-analysis
+    description: Evaluate valuation, quality, solvency, growth, and event risk.
+    criticality: high
+    skill_doc: skills/003-inv-fundamental-analysis.md
+    source_of_truth:
+      - 001-inv-ucc.md#Descripcion del Requerimiento
+      - 001-inv-tkt.md#Objetivo del ticket
+    knowledge_docs:
+      - local/cores/002-fundamental-analysis-core.md
+
+  - id: 004-inv-options-strategy-engine
+    name: options-strategy-engine
+    description: Model options strategy candidates (Wheel, Straddle, Iron Condor), payoff, and Greeks.
+    criticality: high
+    skill_doc: skills/004-inv-options-strategy-engine.md
+    source_of_truth:
+      - 001-inv-spec.md#1
+      - 001-inv-spec.md#2.2
+    knowledge_docs:
+      - local/cores/004-options-strategies-core.md
+
+  - id: 005-inv-institutional-options-flow
+    name: institutional-options-flow
+    description: Infer institutional positioning by strike and expiration from OI and volume proxies.
+    criticality: high
+    skill_doc: skills/005-inv-institutional-options-flow.md
+    source_of_truth:
+      - 001-inv-spec.md#2.2
+      - 001-inv-ucc.md#Descripcion del Requerimiento
+    knowledge_docs:
+      - local/cores/005-institutional-options-flow-core.md
+
+  - id: 006-inv-realtime-news-impact
+    name: realtime-news-impact
+    description: Ingest and classify realtime news and estimate impact for active instruments.
+    criticality: high
+    skill_doc: skills/006-inv-realtime-news-impact.md
+    source_of_truth:
+      - 001-inv-spec.md#2.2
+      - spec.md#SC-006
+    knowledge_docs:
+      - local/cores/006-realtime-news-core.md
+
+  - id: 007-inv-ai-confluence-orchestration
+    name: ai-confluence-orchestration
+    description: Fuse outputs of user-enabled cores and produce explainable confluence recommendations.
+    criticality: critical
+    skill_doc: skills/007-inv-ai-confluence-orchestration.md
+    source_of_truth:
+      - 001-inv-spec.md#2.2
+      - 001-inv-spec.md#10
+      - spec.md#FR-002
+    knowledge_docs:
+      - local/cores/007-ai-confluence-orchestrator-core.md
+
+  - id: 008-inv-market-data-and-realtime
+    name: market-data-and-realtime
+    description: Maintain market data freshness and reliability for active symbols.
+    criticality: critical
+    skill_doc: skills/008-inv-market-data-and-realtime.md
+    source_of_truth:
+      - spec.md#SC-006
+      - 001-inv-ucc.md#Descripcion del Requerimiento
+    knowledge_docs:
+      - local/domain/002-market-data.md
+      - local/patterns/002-realtime-market-feed.md
+
+  - id: 009-inv-execution-governance-human-control
+    name: execution-governance-human-control
+    description: Ensure IA never executes trades and human approval is mandatory.
+    criticality: critical
+    skill_doc: skills/009-inv-execution-governance-human-control.md
+    source_of_truth:
+      - 001-inv-spec.md#0
+      - 001-inv-spec.md#2.1
+      - spec.md#FR-004
+      - spec.md#FR-005
+    knowledge_docs:
+      - local/domain/001-order-lifecycle.md
+      - local/compliance/001-non-advisory-disclaimer.md
+
+  - id: 010-inv-broker-integration-ibkr-alpaca
+    name: broker-integration-ibkr-alpaca
+    description: Support assisted execution and account/position sync across IBKR and Alpaca.
+    criticality: critical
+    skill_doc: skills/010-inv-broker-integration-ibkr-alpaca.md
+    source_of_truth:
+      - spec.md#FR-008
+      - 001-inv-spec.md#3
+    knowledge_docs:
+      - local/brokers/001-ibkr-tws-api.md
+      - local/brokers/002-ibkr-client-portal.md
+      - local/brokers/003-alpaca-api.md
+
+  - id: 011-inv-portfolio-and-performance-analytics
+    name: portfolio-and-performance-analytics
+    description: Compute auditable portfolio performance and risk metrics.
+    criticality: high
+    skill_doc: skills/011-inv-portfolio-and-performance-analytics.md
+    source_of_truth:
+      - 001-inv-tkt.md#Objetivo del ticket
+      - spec.md#FR-011
+    knowledge_docs:
+      - local/domain/003-portfolio-analytics.md
+
+  - id: 012-inv-compliance-audit-retention
+    name: compliance-audit-retention
+    description: Enforce disclaimer, auditability, traceability, and minimum retention policy.
+    criticality: critical
+    skill_doc: skills/012-inv-compliance-audit-retention.md
+    source_of_truth:
+      - spec.md#FR-007
+      - spec.md#FR-013
+      - 001-inv-spec.md#12
+    knowledge_docs:
+      - local/compliance/001-non-advisory-disclaimer.md
+      - local/compliance/002-data-retention-mx.md

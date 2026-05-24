@@ -1,0 +1,33 @@
+{
+  "name": "@inversions/rest-api",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "dev:token": "node scripts/generate-dev-token.js",
+    "dev:token:sync": "node scripts/sync-dev-token-to-frontend.js",
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "ws": "^8.20.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.7.4",
+    "@types/supertest": "^7.2.0",
+    "@vitest/coverage-v8": "^4.1.6",
+    "@vitest/ui": "^4.1.6",
+    "supertest": "^7.2.2",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.22.3",
+    "typescript": "^5.6.2",
+    "vitest": "^4.1.6"
+  }
+}

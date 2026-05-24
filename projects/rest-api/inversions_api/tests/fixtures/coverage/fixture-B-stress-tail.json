@@ -1,0 +1,19 @@
+{
+  "ticker": "SPY",
+  "currentPrice": 337.50,
+  "zones": ["equity_core", "stress_tail"],
+  "coverageStrategies": [
+    {
+      "name": "dynamic_hedge",
+      "type": "put",
+      "notes": "Expect 25% drop scenario with IV spike; increase hedge size, avoid low-OI strikes",
+      "liquidity": "low",
+      "tenorDays": 14
+    }
+  ],
+  "question": "Simulate 25% drop with IV spike and low liquidity; validate hedge size increases and low-OI strikes are rejected.",
+  "scenario": {
+    "dropPercent": 25,
+    "ivSpike": true
+  }
+}

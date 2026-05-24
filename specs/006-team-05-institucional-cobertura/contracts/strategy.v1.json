@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "strategy.v1.json",
+  "title": "Coverage Strategy Contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "strategy_id",
+    "kind",
+    "ticker",
+    "shares",
+    "legs",
+    "capital",
+    "risk_tolerance_pct",
+    "requested_at"
+  ],
+  "properties": {
+    "strategy_id": { "type": "string", "minLength": 1 },
+    "kind": {
+      "type": "string",
+      "enum": ["protective_put", "married_put", "collar_put", "covered_straddle"]
+    },
+    "ticker": { "type": "string", "minLength": 1 },
+    "shares": { "type": "integer", "minimum": 1 },
+    "underlying_price": { "type": "number", "minimum": 0 },
+    "legs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["side", "type", "strike", "premium", "expiration"],
+        "additionalProperties": false,
+        "properties": {
+          "side": { "type": "string", "enum": ["long", "short"] },
+          "type": { "type": "string", "enum": ["call", "put"] },
+          "strike": { "type": "number", "minimum": 0 },
+          "premium": { "type": "number", "minimum": 0 },
+          "expiration": { "type": "string", "minLength": 1 },
+          "multiplier": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "capital": { "type": "number", "minimum": 0 },
+    "risk_tolerance_pct": { "type": "number", "minimum": 0, "maximum": 1 },
+    "target_move_pct": { "type": "number" },
+    "scenario": { "type": "string" },
+    "requested_at": { "type": "string", "minLength": 1 }
+  },
+  "examples": [
+    {
+      "strategy_id": "str_01HZX7J1N4K5R9X8A5K2B3C4D5",
+      "kind": "protective_put",
+      "ticker": "AAPL",
+      "shares": 100,
+      "underlying_price": 192.25,
+      "legs": [
+        {
+          "side": "long",
+          "type": "put",
+          "strike": 185,
+          "premium": 4.2,
+          "expiration": "2026-06-19T00:00:00Z",
+          "multiplier": 100
+        }
+      ],
+      "capital": 19225,
+      "risk_tolerance_pct": 0.1,
+      "target_move_pct": -0.05,
+      "scenario": "nominal",
+      "requested_at": "2026-05-19T10:20:00Z"
+    }
+  ]
+}

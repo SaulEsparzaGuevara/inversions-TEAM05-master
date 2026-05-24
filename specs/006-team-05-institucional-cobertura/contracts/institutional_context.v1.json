@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "institutional_context.v1.json",
+  "title": "Institutional Context Contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "context_id",
+    "ticker",
+    "period",
+    "volume",
+    "liquidity",
+    "horizon",
+    "funds_ownership_pct",
+    "flows",
+    "open_positions",
+    "requested_at"
+  ],
+  "properties": {
+    "context_id": { "type": "string", "minLength": 1 },
+    "ticker": { "type": "string", "minLength": 1 },
+    "instrument": { "type": "string" },
+    "strike": { "type": "number" },
+    "period": {
+      "type": "string",
+      "enum": ["intraday", "daily", "weekly", "monthly", "quarterly"]
+    },
+    "volume": { "type": "number", "minimum": 0 },
+    "liquidity": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "horizon": {
+      "type": "string",
+      "enum": ["short", "medium", "long"]
+    },
+    "funds_ownership_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "flows": {
+      "type": "object",
+      "required": ["inflows", "outflows", "as_of"],
+      "additionalProperties": false,
+      "properties": {
+        "inflows": { "type": "number" },
+        "outflows": { "type": "number" },
+        "as_of": { "type": "string", "minLength": 1 }
+      }
+    },
+    "open_positions": {
+      "type": "object",
+      "required": ["count"],
+      "additionalProperties": false,
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "notional": { "type": "number", "minimum": 0 }
+      }
+    },
+    "source_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "requested_at": { "type": "string", "minLength": 1 }
+  },
+  "examples": [
+    {
+      "context_id": "ctx_01HZX7J1N4K5R9X8A5K2B3C4D5",
+      "ticker": "AAPL",
+      "instrument": "Apple Inc.",
+      "strike": 195,
+      "period": "daily",
+      "volume": 12400000,
+      "liquidity": "high",
+      "horizon": "medium",
+      "funds_ownership_pct": 68.4,
+      "flows": {
+        "inflows": 1245000,
+        "outflows": 820000,
+        "as_of": "2026-05-19T10:15:00Z"
+      },
+      "open_positions": {
+        "count": 42,
+        "notional": 124000000
+      },
+      "source_ids": ["sec_edgar_13f", "finra_trace"],
+      "requested_at": "2026-05-19T10:20:00Z"
+    }
+  ]
+}

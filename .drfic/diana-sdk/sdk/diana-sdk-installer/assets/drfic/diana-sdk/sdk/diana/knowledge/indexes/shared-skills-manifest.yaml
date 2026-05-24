@@ -1,0 +1,31 @@
+version: 1.0.0
+scope: sdk-shared
+last_updated: 2026-04-28
+
+naming_convention:
+  id_format: <NNN>-<PROYECTO>-<ABREV>
+  project_code: SDK
+
+purpose: Shared reusable skills for frameworks/methodologies across multiple projects.
+
+skills:
+  - id: 001-SDK-SDDCORE
+    name: sdd-core-methodology
+    description: Core SDD lifecycle, quality gates, and governance patterns reusable across domains.
+    skill_doc: skills/001-SDK-SDDCORE.md
+    knowledge_docs:
+      - local/methodology/001-sdd-lifecycle.md
+      - local/patterns/001-speckit-integration-patterns.md
+
+  - id: 002-SDK-TSSTACK
+    name: typescript-react-node-stack
+    description: Reusable implementation conventions for TypeScript + React + Node + API patterns.
+    skill_doc: skills/002-SDK-TSSTACK.md
+    knowledge_docs:
+      - local/patterns/001-speckit-integration-patterns.md
+
+inheritance_policy:
+  resolution_order:
+    - shared-sdk
+    - project-override
+  note: Projects should only override when domain constraints require specialization.

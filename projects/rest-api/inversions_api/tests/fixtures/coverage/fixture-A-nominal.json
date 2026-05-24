@@ -1,0 +1,16 @@
+{
+  "ticker": "SPY",
+  "currentPrice": 450.12,
+  "zones": ["equity_core", "hedge_protective"],
+  "coverageStrategies": [
+    {
+      "name": "protective_put",
+      "type": "put",
+      "strikeOffsetPercent": 5,
+      "tenorDays": 30,
+      "liquidity": "high"
+    }
+  ],
+  "question": "Provide a protective put coverage strategy ATM +/-5% for a 30d horizon on a high-liquidity SPY-like instrument." ,
+  "timeSeriesDays": 30
+}

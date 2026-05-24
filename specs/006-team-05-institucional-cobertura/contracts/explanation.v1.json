@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "explanation.v1.json",
+  "title": "Coverage Explanation Contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "response_id",
+    "context_id",
+    "strategy_id",
+    "narrative",
+    "traceability",
+    "requested_at"
+  ],
+  "properties": {
+    "response_id": { "type": "string", "minLength": 1 },
+    "context_id": { "type": "string", "minLength": 1 },
+    "strategy_id": { "type": "string", "minLength": 1 },
+    "narrative": { "type": "string", "minLength": 1 },
+    "traceability": {
+      "type": "object",
+      "required": ["evidence_ids", "model_version", "response_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "model_version": { "type": "string", "minLength": 1 },
+        "response_hash": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ai_unavailable": { "type": "boolean" },
+    "requested_at": { "type": "string", "minLength": 1 }
+  },
+  "examples": [
+    {
+      "response_id": "exp_01HZX7J1N4K5R9X8A5K2B3C4D5",
+      "context_id": "ctx_01HZX7J1N4K5R9X8A5K2B3C4D5",
+      "strategy_id": "str_01HZX7J1N4K5R9X8A5K2B3C4D5",
+      "narrative": "La cobertura reduce el downside esperado y mantiene riesgo acotado dentro del umbral definido.",
+      "traceability": {
+        "evidence_ids": ["ev_01", "ev_02"],
+        "model_version": "claude-3.5-sonnet",
+        "response_hash": "sha256:8f2c2e1f6d0ab9c2a7c0d7b2f0e6f5d7a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5"
+      },
+      "ai_unavailable": false,
+      "requested_at": "2026-05-19T10:20:00Z"
+    }
+  ]
+}

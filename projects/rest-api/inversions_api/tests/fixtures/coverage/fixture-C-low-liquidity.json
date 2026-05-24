@@ -1,0 +1,16 @@
+{
+  "ticker": "SMALLCAP",
+  "currentPrice": 12.34,
+  "zones": ["equity_satellite", "low_liquidity"],
+  "coverageStrategies": [
+    {
+      "name": "selective_put",
+      "type": "put",
+      "notes": "Low ADV and wide spreads; reject strikes with very wide ask/bid",
+      "liquidity": "very_low",
+      "tenorDays": 7
+    }
+  ],
+  "question": "Low ADV and wide spreads: mark low_liquidity in evidence and reject certain strikes.",
+  "evidence": { "lowADV": true, "wideSpreads": true }
+}

@@ -1,0 +1,51 @@
+version: 1.0.0
+project: diana-inversions
+last_updated: 2026-04-28
+
+inheritance:
+  projects_root_radar: .drfic/diana-sdk/projects/knowledge/indexes/projects-knowledge-radar.yaml
+  shared_manifest: .drfic/diana-sdk/sdk/diana/knowledge/indexes/shared-skills-manifest.yaml
+  resolution_order:
+    - projects-root
+    - shared-sdk
+    - project-override
+
+engines:
+  speckit:
+    specify:
+      required_skills: [009-inv-execution-governance-human-control, 012-inv-compliance-audit-retention, 001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 003-inv-fundamental-analysis, 007-inv-ai-confluence-orchestration]
+    clarify:
+      required_skills: [001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 003-inv-fundamental-analysis, 004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 007-inv-ai-confluence-orchestration, 012-inv-compliance-audit-retention]
+    plan:
+      required_skills: [001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 007-inv-ai-confluence-orchestration, 008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics]
+    tasks:
+      required_skills: [008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics, 012-inv-compliance-audit-retention]
+    implement:
+      required_skills: [008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics, 012-inv-compliance-audit-retention]
+
+  openspec:
+    specify:
+      required_skills: [009-inv-execution-governance-human-control, 012-inv-compliance-audit-retention, 001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 003-inv-fundamental-analysis, 007-inv-ai-confluence-orchestration]
+    refine:
+      required_skills: [001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 003-inv-fundamental-analysis, 004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 007-inv-ai-confluence-orchestration, 012-inv-compliance-audit-retention]
+    design:
+      required_skills: [001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 007-inv-ai-confluence-orchestration, 008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics]
+    breakdown:
+      required_skills: [008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics, 012-inv-compliance-audit-retention]
+    build:
+      required_skills: [008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics, 012-inv-compliance-audit-retention]
+
+  generic_sdd:
+    discovery:
+      required_skills: [009-inv-execution-governance-human-control, 012-inv-compliance-audit-retention, 001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 003-inv-fundamental-analysis, 007-inv-ai-confluence-orchestration]
+    architecture:
+      required_skills: [001-inv-technical-analysis-structure, 002-inv-indicator-signal-logic, 004-inv-options-strategy-engine, 005-inv-institutional-options-flow, 006-inv-realtime-news-impact, 007-inv-ai-confluence-orchestration, 008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics]
+    decomposition:
+      required_skills: [008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics, 012-inv-compliance-audit-retention]
+    delivery:
+      required_skills: [008-inv-market-data-and-realtime, 010-inv-broker-integration-ibkr-alpaca, 011-inv-portfolio-and-performance-analytics, 012-inv-compliance-audit-retention]
+
+fallback_policy:
+  - If required skill is missing, continue using engine native methodology.
+  - Report missing skill IDs and suggested /diana.knowledge commands.
+  - Never block plan/tasks/implementation due to missing local skills.

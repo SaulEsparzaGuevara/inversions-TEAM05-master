@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling>=1.24.2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "diana-sdk-installer"
+version = "0.1.4"
+description = "Bootstrap installer for DR.FIC Diana SDK"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "DR.FIC" }
+]
+license = { text = "Proprietary" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent"
+]
+
+[project.scripts]
+diana = "diana_cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/diana_cli"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"assets" = "assets"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/**",
+  "assets/**",
+  "pyproject.toml",
+  "README.md",
+  "CHANGELOG.md"
+]
