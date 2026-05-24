@@ -24,6 +24,10 @@ import {
   type InstitutionalZonesResult
 } from "../../modules/institutional/institutionalZonesEngine.js";
 import {
+  InstitutionalTrendEngine,
+  type InstitutionalTrendResult
+} from "../../modules/institutional/institutionalTrendEngine.js";
+import {
   parseSecEdgar13fReal,
   parseFinraShortInterestReal,
   ensureFinraCache
@@ -32,6 +36,7 @@ import {
 type InstitutionalRouteContext = {
   service: InstitutionalDataService;
   engine: InstitutionalZonesEngine;
+  trendEngine: InstitutionalTrendEngine;
 };
 
 type InstitutionalTrendSummary = {
@@ -101,7 +106,15 @@ export function getInstitutionalRouteContext(): InstitutionalRouteContext {
     liquidityVolumeMultiplier: 1.15
   });
 
-  routeContext = { service, engine };
+  const trendEngine = new InstitutionalTrendEngine({
+    institutionalDataService: service,
+    minCandles: 200,
+    fastMaPeriod: 50,
+    slowMaPeriod: 200,
+    volumeLookback: 20
+  });
+
+  routeContext = { service, engine, trendEngine };
 
   // Eager background preload — does NOT block the return
   ensureFinraCache().catch(() => {});
