@@ -93,6 +93,49 @@ vi.mock("../../../src/routes/institutional/bootstrap.js", async () => {
       },
       service: {
         resolve: async (analysis: any) => buildPositionsResult(analysis)
+      },
+      trendEngine: {
+        async analyze({ analysis: _a }: any) {
+          return {
+            analysis: _a,
+            movingAverages: [
+              { period: 50, value: 102.35, slope: 0.012, rising: true, sampleCount: 50 },
+              { period: 200, value: 98.12, slope: 0.005, rising: true, sampleCount: 200 }
+            ],
+            crossover: { type: "golden_cross", occurredAt: Date.now() - 5 * 86400000, daysSince: 5, ma50: 102.35, ma200: 98.12, spread: 4.23 },
+            currentTrend: "bullish",
+            trendStrength: 0.72,
+            supportLevel: 95.5,
+            resistanceLevel: 108.3,
+            volumeCorrelation: { correlationCoefficient: 0.34, volumeTrend: "increasing", quarterlyReportsAnalyzed: 4 },
+            continuityProbability: {
+              probability: 0.68,
+              factors: { maAlignment: 0.72, volumeConfirmation: 0.65, ownershipTrend: 0.58, flowMomentum: 0.54 }
+            },
+            sourceReports: [],
+            candlesAnalyzed: 260,
+            generatedAt: "2026-05-20T00:00:00.000Z"
+          };
+        }
+      },
+      expirationEngine: {
+        async analyze({ analysis: _a }: any) {
+          return {
+            analysis: _a,
+            expirationEvents: [
+              { type: "monthly_opex", date: Date.now() + 12 * 86400000, label: "Jun 2025 Monthly OpEx", daysUntil: 12, directionalBias: "neutral", significance: 0.6 }
+            ],
+            slipperySlope: { direction: "symmetric", accelerationFactor: 0.3, driftPct: 0.5, attractorStrike: 100, confidence: 0.65, peakDays: 12 },
+            catalystWindows: [
+              { type: "fomc", date: Date.now() + 8 * 86400000, label: "FOMC Meeting Jun 2025", daysUntil: 8, volatilityImpact: 0.7, volumeSurgeFactor: 1.8, confidence: 0.85 }
+            ],
+            timeDecay: { thetaPct: 0.35, gammaExposurePct: 0.12, accelerationDays: 5, decayRegime: "near", vannaExposurePct: 0.08, charmPct: 0.02 },
+            quarterlyCorrelation: { overlappingWindows: 1, averageImpactPct: 2.1, totalQuarterlyWindows: 4, filingExpirationCorrelation: 0.45, currentlyInWindow: false, daysUntilNextWindow: 15 },
+            sourceReports: [],
+            analysisWindowDays: 90,
+            generatedAt: "2026-05-20T00:00:00.000Z"
+          };
+        }
       }
     })
   };

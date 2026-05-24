@@ -16,62 +16,66 @@ Express.js en `src/index.ts` monta **3 grupos de rutas**:
 
 ---
 
-## 1. Institutional — Mock Data
+## 1. Institutional — Fuentes Reales y Degradación
 
 ### Bootstrap (`routes/institutional/bootstrap.ts`)
 
-La función `getInstitutionalRouteContext()` (línea 80) arranca toda la tubería:
+La función `getInstitutionalRouteContext()` arranca toda la tubería con `globalThis.fetch` directo:
 
 ```
 getInstitutionalRouteContext()
-  → InstitutionalDataService(fetchImpl: createMockInstitutionalFetch())
+  → InstitutionalDataService(fetchImpl: globalThis.fetch)
   → InstitutionalZonesEngine(candles: sintéticas sinusoidales)
 ```
 
-### Contracto desde request
+### Fuentes de datos reales
 
-`buildInstitutionalAnalysisContractFromRequest()` (línea 102) genera datos sintéticos a partir del ticker, periodo y horizonte:
+Las 4 fuentes configuradas apuntan a APIs reales:
 
-```ts
-const seed = buildTickerSeed(ticker);
-// buildTickerSeed("SPY") = 83('S') + 80('P') + 89('Y') = 252
+| sourceId | API | Parser | Cache TTL |
+|----------|-----|--------|-----------|
+| `sec-edgar-13f` | EFTS + SEC.gov XML | `parseSecEdgar13fReal()` | 600s |
+| `finra-short-interest` | FINRA API REST | `parseFinraShortInterestReal()` | 300s |
+| `yahoo-options-flow` | Yahoo v7 Finance Options | `parseYahooOptionsFlow()` | 120s |
+| `yahoo-institutional` | Yahoo v10 Quote Summary | `parseYahooInstitutional()` | 600s |
 
-const volume     = Math.round(900_000 + seed * 850 * periodFactor * horizonFactor);
-const ownership  = Math.min(96, 18 + (seed % 34) + ((horizonFactor - 1) * 14));
-const inflows    = volume * (0.34 + (seed % 5) * 0.03);
-const outflows   = volume * (0.18 + (periodFactor - 1) * 0.05);
-const positions  = Math.max(3, Math.round(seed / 11 + periodFactor * 4 + horizonFactor * 3));
+### Parsers Yahoo Finance
+
+#### `yahooOptionsParser.ts` — Options Flow (T338)
+
+Obtiene la cadena de opciones desde la API v7 de Yahoo Finance:
+- Autenticación vía crumb (cookie + token) con flujo de 3 pasos
+- Detección de strikes "unusual" (volumen > 2× open interest)
+- Put/Call ratio por strike
+- Confidence scoring basado en: expiraciones detectadas, strikes inusuales, volumen total, OI total
+- Fallback sintético con `confidence = 0.3` cuando la API no responde
+
+#### `yahooInstitutionalParser.ts` — Institutional Holdings (T339)
+
+Obtiene tenencias institucionales desde la API v10 de Yahoo Finance:
+- Extrae `institutionOwnership.ownershipList` (holders individuales)
+- Extrae `majorHoldersBreakdown` (% held por instituciones)
+- Calcula `fundsOwnershipPct` y flujos netos (inflows/outflows)
+- Confidence scoring basado en: holders count, breakdown disponible, flujos calculados
+- Fallback sintético con `confidence = 0.3` cuando la API no responde
+
+### Degradación Gradual (T214)
+
+El `InstitutionalDataService.resolve()` nunca lanza error. Cada fuente produce un `sourceReport` individual con su resultado:
+
+```
+sourceReports: Array<{
+  sourceId: string;
+  status: "ok" | "error" | "cached" | "rate_limited" | "skipped";
+  latencyMs: number;
+  error?: string;
+}>
 ```
 
-Los **factores** varían según periodo y horizonte:
-
-| Periodo | Factor | Horizonte | Factor |
-|---------|--------|-----------|--------|
-| intraday | 0.75 | short | 0.9 |
-| daily | 1.0 | medium | 1.0 |
-| weekly | 1.18 | long | 1.12 |
-| monthly | 1.38 | | |
-| quarterly | 1.58 | | |
-
-Esto hace que el mismo ticker produzca **siempre los mismos números** (determinista), y tickers distintos produzcan datos distintos (porque cambia la suma de charCodes).
-
-### Mock Fetch
-
-`createMockInstitutionalFetch()` (línea 288) intercepta TODAS las URLs de fuentes. Sin importar si el path es `sec-edgar-13f`, `finra-short-interest`, `unusual-whales` o `finviz-institutional`, `buildMockPayload()` (línea 313) devuelve JSON sintético.
-
-Las 4 fuentes configuradas en `buildDefaultSourceConfigs()` (línea 235) **todas** apuntan a `https://institutional.mock` — nunca se contacta un API real:
-
-```ts
-{
-  sourceId: "sec-edgar-13f",
-  kind: "sec_edgar_13f",
-  label: "SEC EDGAR 13F",
-  baseUrl: "https://institutional.mock",
-  // ...
-}
-```
-
-El mock fetch recibe el `input` (URL), lo parsea, extrae ticker/period/horizon de los query params y llama a `buildMockPayload()`.
+El `overallStatus` se computa automáticamente:
+- **`"ok"`** — todas las fuentes retornaron datos
+- **`"partial"`** — algunas fuentes fallaron, pero al menos una retornó datos
+- **`"all_failed"`** — ninguna fuente retornó datos utilizables → HTTP 503
 
 ### Motor de Zonas
 
@@ -79,18 +83,17 @@ El mock fetch recibe el `input` (URL), lo parsea, extrae ticker/period/horizon d
 
 ### InstitutionalDataService — Arquitectura
 
-El servicio (1162 líneas en `institutionalDataService.ts`) está diseñado para producción, aunque el fetch actual sea mock:
+El servicio (en `institutionalDataService.ts`) está diseñado para producción con fuentes reales:
 
 - **Caché en memoria** con TTL configurable y evicción LRU (`Map<string, CacheEntry>`)
 - **Rate limiting** por fuente con sliding window de 60 segundos
 - **Fallback** entre fuentes ordenadas por prioridad
-- **Parsers normalizados** por tipo de fuente (`parseSecEdgar13f`, `parseFinraShortInterest`, `parseUnusualWhales`, `parseFinvizInstitutional`)
+- **Parsers normalizados** por tipo de fuente (`parseSecEdgar13f`, `parseFinraShortInterest`, `parseYahooOptionsFlow`, `parseYahooInstitutional`)
 - **Merge de observaciones**: promedia ownership, suma flujos, toma el máximo volumen, elige la liquidez más alta
 - **Timeouts** con `AbortController` (default 12s)
 - **API Key** soportada vía `source.apiKey` → header `Authorization: Bearer`
 - **Manejo de errores** con tipos normalizados (`InstitutionalSourceError`)
-
-Para conectar fuentes reales solo hay que cambiar el `fetchImpl` en `bootstrap.ts:87` — el resto del servicio ya soporta URLs reales, API keys, timeouts, parsers custom, etc.
+- **Degradación gradual**: `overallStatus: "ok" | "partial" | "all_failed"` + HTTP 503
 
 ---
 
@@ -188,13 +191,17 @@ Usa `CoverageSimulationEngine` para ejecutar:
 
 ---
 
-## Resumen Mock vs Real
+## Resumen Fuentes
 
-| Feature | Backend | Fuente de Datos | Real/Mock |
-|---------|---------|-----------------|-----------|
-| Análisis Institucional | `createMockInstitutionalFetch()` | `buildTickerSeed()` + factores | **Mock** |
-| Posiciones Regulatorias | Misma tubería que analysis | `buildTickerSeed()` + factores | **Mock** |
-| Zonas S/R | `InstitutionalZonesEngine` | Velas sinusoidales sintéticas | **Mock** |
+| Feature | Backend | Fuente de Datos | Tipo |
+|---------|---------|-----------------|------|
+| SEC EDGAR 13F | `parseSecEdgar13fReal()` | EFTS + SEC.gov XML | **Real** |
+| FINRA Short Interest | `parseFinraShortInterestReal()` | FINRA API REST (caché completa) | **Real** |
+| Yahoo Options Flow | `parseYahooOptionsFlow()` | Yahoo v7 Finance (crumb auth) | **Real** |
+| Yahoo Institutional | `parseYahooInstitutional()` | Yahoo v10 Quote Summary | **Real** |
+| Análisis Institucional | `InstitutionalDataService` + `InstitutionalZonesEngine` | 4 fuentes reales + degradación gradual | **Real** |
+| Posiciones Regulatorias | Misma tubería que analysis | Idem + sourceReports individuales | **Real** |
+| Zonas S/R | `InstitutionalZonesEngine` | Velas sinusoidales sintéticas | **Sintético** |
 | Estrategias Cobertura | `ProtectivePutEngine` / `CollarEngine` / `CoveredStraddleEngine` | Matemática pura sobre inputs del usuario | **Real** |
 | Comparador Estrategias | `CoverageComparator` | Simulación + scoring determinista | **Real** |
 | Simulación (Monte Carlo) | `CoverageSimulationEngine` | RNG con semilla + escenarios | **Real** |

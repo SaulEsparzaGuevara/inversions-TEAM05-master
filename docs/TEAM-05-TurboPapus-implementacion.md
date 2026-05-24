@@ -123,17 +123,17 @@ Define tipos y validadores para el análisis institucional:
 
 **Archivo**: `src/modules/institutional/institutionalDataService.ts`
 
-Consume 4 fuentes externas:
+Consume 4 fuentes externas reales:
 1. SEC EDGAR 13F — tenencias de fondos institucionales
 2. FINRA Short Interest — posiciones cortas
-3. Unusual Whales — flujo institucional
-4. Finviz Institutional — ownership porcentual
+3. Yahoo Options Flow — flujo de opciones (reemplaza Unusual Whales)
+4. Yahoo Institutional — ownership institucional (reemplaza Finviz)
 
 Características:
 - Cache configurable por fuente (TTL por source)
 - Rate limiting (30 req/min por fuente)
-- Fallback: si una fuente falla, continua con las demás
-- Mock fetch para desarrollo
+- Fallback y degradación: si una fuente falla, continúa con las demás
+- **Graceful degradation**: `overallStatus` (ok/partial/all_failed), HTTP 503
 - Normalización de respuestas a `InstitutionalSourceObservation`
 
 ### T113 — Contrato de Estrategias de Cobertura
@@ -209,7 +209,8 @@ Retorna posiciones 13F, flujos institucionales y reportes de cada fuente.
 **Archivo**: `src/routes/institutional/bootstrap.ts`
 
 - Singleton: `InstitutionalDataService` + `InstitutionalZonesEngine`
-- Mock fetch que genera datos realistas basados en seed del ticker
+- Fetch real vía `globalThis.fetch` (mock infrastructure eliminada en T340)
+- 4 fuentes reales: SEC EDGAR, FINRA, Yahoo Options, Yahoo Institutional
 - Funciones helper: `buildInstitutionalAnalysisContractFromRequest()`, `groupInstitutionalZones()`,
   `buildInstitutionalTrendSummary()`, `buildInstitutionalMetricsSummary()`
 
@@ -626,99 +627,8 @@ GEMINI_API_KEY=AIzaSy...
 ## 12. Resultados Finales
 
 ### Tests
+
 ```
-npm test → 23 suites, 70 tests, 0 failures
+npm test → 33 suites, 70+ tests, 0 failures (55 solo institucionales)
 npm run lint → EXIT_CODE: 0
 ```
-
-### Endpoints Activos
-
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/health` | Health check |
-| GET | `/api/institutional/analysis` | Análisis institucional con zonas S/R |
-| GET | `/api/institutional/positions` | Posiciones regulatorias |
-| POST | `/api/ai/institutional-chat` | Chat IA (devuelve 202 con pollingUrl) |
-| GET | `/api/ai/institutional-chat/poll/:id` | Polling de resultado Gemini |
-
-### Archivos Creados/Modificados (Backend)
-
-```bash
-src/
-├── modules/
-│   ├── ai/
-│   │   └── institutionalCopilotChat.ts    # 574 líneas - Chat IA con Gemini
-│   ├── institutional/
-│   │   ├── institutionalContract.ts       # 226 líneas - Contrato T106
-│   │   ├── institutionalDataService.ts    # 1162 líneas - Datos multi-fuente T107
-│   │   └── institutionalZonesEngine.ts    # 507 líneas - Zonas S/R T108
-│   └── strategies/
-│       ├── standards/
-│       │   └── strategyOutputStandard.ts  # 320 líneas - Estándar transversal
-│       └── coverage/
-│           ├── coverageTypes.ts           # 641 líneas - Tipos compartidos
-│           ├── coverageStrategyContract.ts # 200 líneas - Contrato T113
-│           ├── coverageStrategyAdapter.ts  # 75 líneas - Adaptador transversal T173
-│           ├── protectivePutEngine.ts     # 255 líneas - Protective Put T114
-│           ├── collarEngine.ts            # 230 líneas - Collar Put T115
-│           ├── coveredStraddleEngine.ts   # 245 líneas - Covered Straddle T116
-│           ├── coverageSimulationEngine.ts# 382 líneas - Simulación T117
-│           ├── coverageRiskService.ts     # 95 líneas - Riesgos T118
-│           ├── coverageReportService.ts   # 102 líneas - Reporting T119
-│           └── coverageComparator.ts      # 101 líneas - Comparador T120
-├── routes/
-│   ├── institutional/
-│   │   ├── bootstrap.ts                   # 467 líneas - Fábrica compartida
-│   │   ├── institutionalAnalysis.ts       # 43 líneas - API T111
-│   │   └── regulatoryPositions.ts         # 42 líneas - API T112
-│   └── ai/
-│       └── institutionalCopilot.ts        # 129 líneas - Router T121
-├── database/supabase/migrations/
-│   └── 008_institutional_copilot.sql      # 54 líneas - Tablas T201
-├── jobs/
-│   └── purgeEvidenceJob.ts                # 59 líneas - Purge T202
-├── observability/
-│   └── coverageMetrics.ts                 # Métricas T203
-├── lib/resilience/
-│   ├── retryWithBackoff.ts                # Retry T208
-│   ├── staleInput.ts                      # Stale input T208
-│   └── partialDataHandler.ts              # Partial data T208
-└── index.ts                               # Montaje de rutas
-
-tests/
-├── unit/
-│   ├── institutional/
-│   │   ├── institutionalContract.test.ts
-│   │   └── institutionalZonesEngine.test.ts
-│   └── strategies/coverage/
-│       ├── protectivePutEngine.test.ts
-│       ├── collarEngine.test.ts
-│       ├── coveredStraddleEngine.test.ts
-│       └── coverageComparator.test.ts
-├── integration/institutional/
-│   ├── institutionalAnalysis.test.ts
-│   └── regulatoryPositions.test.ts
-└── fixtures/coverage/
-    ├── fixture-A-nominal.json
-    ├── fixture-B-stress-tail.json
-    ├── fixture-C-low-liquidity.json
-    └── index.ts
-
-tools/
-└── reconstruct_explanation.ts             # Auditoría T205
-
-scripts/
-└── validate-contract-compat.sh            # Validación T206
-
-ops/docs/
-└── retention.md                           # Documentación T210
-```
-
-### Tasks Completadas
-
-**Canónicas** (14): T106, T107, T108, T111, T112, T113, T114, T115, T116, T117, T118, T119, T120, T121
-**Transversales** (1): T173
-**Tests** (3): T184, T185, T186
-**Derivadas** (8): T200, T201, T202, T203, T204, T205, T206, T207, T208, T209, T210
-
-**Total: 30/30 tasks — 100% completo**

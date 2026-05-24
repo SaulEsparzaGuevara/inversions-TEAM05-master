@@ -35,12 +35,13 @@ El proyecto es un **monorepo (npm workspaces)** con 5 paquetes:
 | `@inversions/ui-library` | `projects/packages/ui-library/` | Componentes UI compartidos |
 
 **Logros clave**:
-- 14 tareas canónicas + 8 derivadas + 3 transversales + tests completados
+- 18 tareas canónicas + 8 derivadas + 3 transversales + tests completados
 - Motores de cobertura con matemática pura (sin APIs externas)
-- Parsers reales para SEC EDGAR 13F y FINRA Short Interest
+- Parsers reales para SEC EDGAR 13F, FINRA Short Interest, Yahoo Options e Institutional
+- Degradación gradual multi-fuente con HTTP 503, `overallStatus`, `sourceReports` individuales
 - Chat IA con Gemini 2.5-flash con polling asíncrono y degradación controlada
 - Frontend PWA con 4 páginas nuevas, gráficos interactivos y navegación SPA
-- Cobertura de tests: 23 suites, 70 tests, 0 fallos
+- Cobertura de tests: 33 suites, 55+ tests, 0 fallos
 - Lint: 0 errores (`tsc --noEmit`)
 
 ---
@@ -178,7 +179,16 @@ Todos los archivos están en `projects/rest-api/inversions_api/src/modules/strat
 | T210 | `ops/docs/retention.md` | Documentación de retención y storage tiering |
 | T173 | `coverageStrategyAdapter.ts` | Adaptador al estándar transversal |
 
-### 4.5 Endpoints REST de Cobertura (T304–T306)
+### 4.5 Fuentes Reales y Degradación (T338–T340, T214)
+
+| Tarea | Archivo | Descripción |
+|-------|---------|-------------|
+| T338 | `src/modules/institutional/yahooOptionsParser.ts` | Parser de opciones Yahoo v7 con crumb auth, detección de volumen inusual, fallback sintético |
+| T339 | `src/modules/institutional/yahooInstitutionalParser.ts` | Parser institucional Yahoo v10 con holders, breakdown, flujos netos, fallback sintético |
+| T340 | `src/routes/institutional/bootstrap.ts` | Eliminación de código muerto mock (~90 líneas), fetchImpl directo a `globalThis.fetch` |
+| T214 | `institutionalDataService.ts`, `institutionalZonesEngine.ts`, `institutionalAnalysis.ts`, `regulatoryPositions.ts` | Degradación gradual: `overallStatus` (ok/partial/all_failed), HTTP 503, sourceReports individuales |
+
+### 4.6 Endpoints REST de Cobertura (T304–T306)
 
 | Tarea | Archivo | Descripción |
 |-------|---------|-------------|
@@ -266,183 +276,71 @@ ensureFinraCache().catch(() => {});
 3. Extrae posiciones por `nameOfIssuer` o CUSIP
 4. Paralelizado con `Promise.all` (~3.4s vs 19s original)
 
-### 6.3 Yahoo Finance Options Flow (T338) — ⬜ PENDIENTE
+### 6.3 Yahoo Finance Options Flow (T338) — ✅ COMPLETADO
 
-**Archivo**: `projects/rest-api/inversions_api/src/modules/institutional/realSourceParsers.ts`
+**Archivo**: `projects/rest-api/inversions_api/src/modules/institutional/yahooOptionsParser.ts`
 
-**Qué falta implementar**:
-- `fetchYahooOptions(ticker)` — obtener cadena de opciones desde `query1.finance.yahoo.com/v7/finance/options/{ticker}`
-- `computeOptionsFlowSignal()` — detectar strikes donde volumen > 2× OI (señal "unusual")
-- `parseYahooOptionsFlow()` — normalizar a `InstitutionalSourceObservation`
-- Registrar source `yahoo-options-flow` en `bootstrap.ts`
+Implementa la obtención de la cadena de opciones desde Yahoo Finance v7:
+- Autenticación crumb: cookie → crumb → request autenticado
+- `computeOptionsFlowSignal()` detecta strikes con volumen > 2× OI (señal "unusual")
+- Put/Call ratio por strike y global
+- Confidence scoring dinámico basado en: expiraciones, strikes inusuales, volumen, OI
+- Graceful fallback: si la API falla, retorna observación sintética con `confidence: 0.3`
+- 2 source configs: `yahoo-options-flow` con prioridad 3 sobre `query1.finance.yahoo.com/v7/finance/options`
+- Tests: 6 casos (nominal, empty, sin datos, HTTP errors, fallback, confidence)
 
-### 6.4 Yahoo Finance Institutional (T339) — ⬜ PENDIENTE
+### 6.4 Yahoo Finance Institutional (T339) — ✅ COMPLETADO
 
-**Archivo**: `projects/rest-api/inversions_api/src/modules/institutional/realSourceParsers.ts`
+**Archivo**: `projects/rest-api/inversions_api/src/modules/institutional/yahooInstitutionalParser.ts`
 
-**Qué falta implementar**:
-- `fetchYahooInstitutional(ticker)` — obtener `quoteSummary.institutionOwnership` desde `query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=institutionOwnership`
-- `parseYahooInstitutional()` — extraer holders count, % held, change → derivar inflows/outflows
-- Registrar source `yahoo-institutional` en `bootstrap.ts`
+Implementa la obtención de tenencias institucionales desde Yahoo Finance v10:
+- Autenticación crumb (mismo flujo que T338)
+- Extrae `institutionOwnership.ownershipList` (holders individuales con name, shares, change)
+- Extrae `majorHoldersBreakdown` (% held por instituciones)
+- Calcula `fundsOwnershipPct`, flujos netos agregados (inflows/outflows)
+- Confidence scoring: holders, breakdown, flujos, stale data penalty
+- Graceful fallback: si la API falla, retorna observación sintética con `confidence: 0.3`
+- Source config: `yahoo-institutional` con prioridad 4 sobre `query1.finance.yahoo.com/v10/finance/quoteSummary`
+- Tests: 5 casos (nominal, empty ownership, sin breakdown, HTTP errors, fallback)
 
-### 6.5 Eliminación de Mocks (T340) — ⬜ PENDIENTE
+### 6.5 Eliminación de Mocks (T340) — ✅ COMPLETADO
 
-**⚠️ IMPORTANTE**: No eliminar los mocks hasta que T338 y T339 estén completos y funcionales.
-
-**Qué archivos modificar**:
-- `src/routes/institutional/bootstrap.ts`:
-  - Eliminar `createMockInstitutionalFetch()`
-  - Eliminar `buildMockPayload()`
-  - Eliminar `createMixedFetch()` — reemplazar por `globalThis.fetch` directo
-  - Eliminar configs `unusual-whales` y `finviz-institutional`
-  - Agregar configs `yahoo-options-flow` y `yahoo-institutional`
-- `src/modules/institutional/institutionalDataService.ts`:
-  - Eliminar `parseUnusualWhales()` (línea 609)
-  - Eliminar `parseFinvizInstitutional()` (línea 634)
+Se eliminó todo el código muerto del `bootstrap.ts`:
+- `createMockInstitutionalFetch()` eliminada
+- `buildMockPayload()` eliminada
+- `createMixedFetch()` eliminada — reemplazada por `globalThis.fetch` directo
+- Configs mock `unusual-whales` y `finviz-institutional` reemplazadas por `yahoo-options-flow` y `yahoo-institutional`
+- `institutional.mock` string reference eliminada
+- `FetchLike` import reducido al mínimo necesario (~90 líneas eliminadas en total)
 
 ---
 
 ## 7. Lo que Está Pendiente
 
-### 7.1 Alta Prioridad — Yahoo Finance + Mock Cleanup
+### 7.1 Completado — Yahoo Finance + Mock Cleanup + Graceful Degradation
 
 ```
-FASE 1 (en paralelo)     FASE 2          FASE 3
-┌──────────────┐        ┌──────────────┐ ┌──────────────┐
-│ T338: Yahoo  │        │ T340: Elim.  │ │ T341: Data   │
-│ Options Flow │───────→│ Mock Infra   │─→│ Source Docs  │
-└──────────────┘        └──────────────┘ └──────────────┘
-┌──────────────┐
-│ T339: Yahoo  │───────→
+FASE 1           FASE 2          FASE 3          FASE 4
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ T338: Yahoo  │ │ T340: Elim.  │ │ T214: Grace  │ │ T341: Data   │
+│ Options Flow │→│ Mock Infra   │→│ Degradation  │→│ Source Docs  │
+└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
+┌──────────────┐                        (actual)       (pendiente)
+│ T339: Yahoo  │──────────────→
 │ Inst. Owners│
 └──────────────┘
 ```
 
-#### T338: Yahoo Finance Options Flow Parser
+| Tarea | Estado | Archivos |
+|-------|--------|----------|
+| T338 — Yahoo Options Flow | ✅ Completado | `yahooOptionsParser.ts`, test |
+| T339 — Yahoo Institutional | ✅ Completado | `yahooInstitutionalParser.ts`, test |
+| T340 — Mock Cleanup | ✅ Completado | `bootstrap.ts` (~90 líneas eliminadas) |
+| T214 — Graceful Degradation | ✅ Completado | `institutionalDataService.ts`, `institutionalZonesEngine.ts`, `institutionalAnalysis.ts`, `regulatoryPositions.ts`, test |
 
-**Archivo**: `projects/rest-api/inversions_api/src/modules/institutional/realSourceParsers.ts`
+#### T341: Data Source Matrix Documentation (⬜ PENDIENTE)
 
-Implementar:
-
-```typescript
-// 1. Obtener cadena de opciones
-async function fetchYahooOptions(ticker: string): Promise<{
-  calls: Array<{ strike: number; volume: number; openInterest: number }>;
-  puts: Array<{ strike: number; volume: number; openInterest: number }>;
-  underlyingPrice: number;
-}> {
-  const url = `https://query1.finance.yahoo.com/v7/finance/options/${ticker}`;
-  const resp = await fetch(url);
-  const json = await resp.json();
-  // Parsear json.optionChain.result[0].options[0]
-}
-
-// 2. Detectar señales "unusual"
-function computeOptionsFlowSignal(options: OptionsChain): {
-  bullishCount: number;
-  bearishCount: number;
-  signals: Array<{ strike: number; type: "call" | "put"; volumeRatio: number }>;
-} {
-  // Volumen > 2× OI = señal "unusual"
-  // Call con volumen inusual = bullish
-  // Put con volumen inusual = bearish
-}
-
-// 3. Normalizar a InstitutionalSourceObservation
-export async function parseYahooOptionsFlow(
-  _payload: unknown,
-  request: InstitutionalAnalysisContract,
-  source: InstitutionalSourceConfig
-): Promise<InstitutionalSourceObservation | null> {
-  // Usa fetchYahooOptions + computeOptionsFlowSignal
-  // confidence basado en cantidad de señales detectadas
-}
-```
-
-Registrar en `bootstrap.ts` → `buildDefaultSourceConfigs()`:
-```typescript
-{
-  sourceId: "yahoo-options-flow",
-  kind: "yahoo_options_flow",
-  label: "Yahoo Finance Options Flow",
-  enabled: true,
-  tier: "free",
-  baseUrl: "https://query1.finance.yahoo.com",
-  path: "/v7/finance/options",
-  priority: 3, // reemplaza unusual-whales
-  cacheTtlMs: 120_000,
-  rateLimitPerMinute: 30,
-  parser: parseYahooOptionsFlow
-}
-```
-
-#### T339: Yahoo Finance Institutional Parser
-
-**Archivo**: `projects/rest-api/inversions_api/src/modules/institutional/realSourceParsers.ts`
-
-Implementar:
-
-```typescript
-// 1. Obtener ownership institucional
-async function fetchYahooInstitutional(ticker: string): Promise<{
-  holders: Array<{ name: string; shares: number; change: number }>;
-  totalHolders: number;
-  pctHeld: number;
-}> {
-  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=institutionOwnership`;
-  const resp = await fetch(url);
-  const json = await resp.json();
-  // Parsear json.quoteSummary.result[0].institutionOwnership
-}
-
-// 2. Normalizar a InstitutionalSourceObservation
-export async function parseYahooInstitutional(
-  _payload: unknown,
-  request: InstitutionalAnalysisContract,
-  source: InstitutionalSourceConfig
-): Promise<InstitutionalSourceObservation | null> {
-  // Extraer holders, % held, change → inflows/outflows
-}
-```
-
-Registrar en `bootstrap.ts`:
-```typescript
-{
-  sourceId: "yahoo-institutional",
-  kind: "yahoo_institutional",
-  label: "Yahoo Finance Institutional",
-  enabled: true,
-  tier: "free",
-  baseUrl: "https://query1.finance.yahoo.com",
-  path: "/v10/finance/quoteSummary",
-  priority: 4, // reemplaza finviz-institutional
-  cacheTtlMs: 600_000,
-  rateLimitPerMinute: 10,
-  parser: parseYahooInstitutional
-}
-```
-
-#### T340: Eliminar Mock Infrastructure
-
-**⚠️ NO HACER hasta que T338 y T339 estén funcionando correctamente.**
-
-Archivo `projects/rest-api/inversions_api/src/routes/institutional/bootstrap.ts`:
-1. Eliminar función `createMockInstitutionalFetch()` (~línea 312)
-2. Eliminar función `buildMockPayload()` (~línea 337)
-3. Eliminar función `createMixedFetch()` (~línea 300)
-4. En `getInstitutionalRouteContext()` (~línea 86), cambiar:
-   ```typescript
-   // Antes:
-   fetchImpl: createMixedFetch()
-   // Después:
-   fetchImpl: globalThis.fetch.bind(globalThis)
-   ```
-5. Eliminar `parseUnusualWhales()` y `parseFinvizInstitutional()` de `institutionalDataService.ts`
-6. Eliminar configs `unusual-whales` y `finviz-institutional` de `buildDefaultSourceConfigs()`
-
-#### T341: Data Source Matrix Documentation
-
-Actualizar la Data Source Matrix en estos archivos cuando T338-T340 estén completos:
+Actualizar la Data Source Matrix en estos archivos:
 - `specs/006-team-05-institucional-cobertura/tasks.md`
 - `specs/006-team-05-institucional-cobertura/spec.md`
 - `specs/006-team-05-institucional-cobertura/plan.md`
@@ -450,25 +348,22 @@ Actualizar la Data Source Matrix en estos archivos cuando T338-T340 estén compl
 - `specs/007-team-05-frontend-cobertura/spec.md`
 - `specs/007-team-05-frontend-cobertura/plan.md`
 
-Cambiar el estado de Yahoo Finance Options Flow e Institutional de ⬜ PENDIENTE a ✅ REAL.
-
 ### 7.2 Prioridad Media
 
 | Tarea | Descripción | Archivos |
 |-------|-------------|----------|
-| T214 | Upstream source failure degradation: cuando una fuente falla, incluir `sourceReports[].status = "error"` en la respuesta. Si todas fallan, retornar HTTP 503. | `institutionalDataService.ts`, `institutionalAnalysis.ts`, `regulatoryPositions.ts` |
 | — | Ampliar mapa CUSIP en `cusipForTicker()` — solo tiene 12 tickers (AAPL, MSFT, GOOGL, GOOG, AMZN, META, TSLA, NVDA, JPM, V, SPY, QQQ) | `realSourceParsers.ts` |
-| — | Tests de integración para fuentes reales (SEC, FINRA) | `tests/integration/institutional/` |
+| — | Tests de integración para fuentes reales (SEC, FINRA, Yahoo) | `tests/integration/institutional/` |
+| — | T208 — Integrar resiliencia (retryWithBackoff, staleInput, partialDataHandler) en InstitutionalDataService | `src/lib/resilience/` |
 
 ### 7.3 Issues Conocidos
 
 | Issue | Archivo | Descripción |
 |-------|---------|-------------|
-| Mocks activos | `bootstrap.ts` | Institutional analysis usa datos sintéticos (mock) hasta T338-T340 |
-| Yahoo parsers | `realSourceParsers.ts` | No implementados — el único reemplazo gratuito para Unusual Whales y Finviz |
 | Gemini API key | `.env` | Requiere `GEMINI_API_KEY` configurada manualmente en cada entorno |
 | FINRA preload | `bootstrap.ts` | `ensureFinraCache()` corre al arrancar — si falla, las fuentes FINRA devuelven null |
 | SEC parsing | `realSourceParsers.ts` | Depende de `cusipForTicker()` — solo 12 tickers mapeados. Puede fallar para tickers sin CUSIP |
+| Yahoo rate limit | yahoo parsers | APIs no oficiales — sin garantía de disponibilidad. Los parsers tienen fallback sintético |
 
 ---
 
@@ -583,16 +478,19 @@ curl "http://localhost:3000/api/ai/institutional-chat/poll/<responseId>"
 
 ### Alta Prioridad
 
-- [ ] **T338**: Yahoo Finance Options Flow parser → `realSourceParsers.ts`, `bootstrap.ts`
-- [ ] **T339**: Yahoo Finance Institutional parser → `realSourceParsers.ts`, `bootstrap.ts`
-- [ ] **T340**: Eliminar mock infrastructure → `bootstrap.ts`, `institutionalDataService.ts` (solo después de T338+T339)
+### Alta Prioridad
+
+- [x] **T338**: Yahoo Finance Options Flow parser
+- [x] **T339**: Yahoo Finance Institutional parser
+- [x] **T340**: Eliminar mock infrastructure
+- [x] **T214**: Graceful degradation (HTTP 503 cuando todas las fuentes fallan)
 - [ ] **T341**: Data Source Matrix documentation → specs 006 y 007
 
 ### Prioridad Media
 
-- [ ] **T214**: Upstream source failure degradation (status error + HTTP 503)
 - [ ] Ampliar mapa CUSIP en `cusipForTicker()` (solo 12 tickers actualmente)
-- [ ] Tests de integración para fuentes reales (SEC, FINRA)
+- [ ] Tests de integración para fuentes reales (SEC, FINRA, Yahoo)
+- [ ] T208 — Integrar resiliencia (retry, stale, partial data)
 
 ### Prioridad Baja
 
