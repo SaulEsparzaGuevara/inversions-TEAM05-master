@@ -13,8 +13,8 @@ description: "Task list for 006-team-05-institucional-cobertura"
 |--------|------|--------|--------|
 | SEC EDGAR 13F | free | ⬜ PENDIENTE | `parseSecEdgar13fReal()` (T334) |
 | FINRA Short Interest | free | ⬜ PENDIENTE | `parseFinraShortInterestReal()` (T333) |
-| Yahoo Finance Options Flow | free | ⬜ PENDIENTE | `parseYahooOptionsFlow()` (T211) |
-| Yahoo Finance Institutional | free | ⬜ PENDIENTE | `parseYahooInstitutional()` (T212) |
+| Yahoo Finance Options Flow | free | ✅ REAL | `parseYahooOptionsFlow()` (T338) |
+| Yahoo Finance Institutional | free | ✅ REAL | `parseYahooInstitutional()` (T339) |
 
 ## Preserved (Canonical) Tasks
 
@@ -77,22 +77,22 @@ Se incluyen sin omisión todas las tareas canónicas del backlog del equipo, tom
 
 ---
 
-### Phase 3: Yahoo Finance Data Sources & Mock Cleanup
+### Phase 3: Yahoo Finance Data Sources & Mock Cleanup (Completado)
 
-- [ ] T211 [P] Implement Yahoo Finance Options Flow parser in `realSourceParsers.ts` — replaces Unusual Whales
-  - T211a Implement `fetchYahooOptions(ticker)` — fetch options chain from `query1.finance.yahoo.com/v7/finance/options/{ticker}`, parse calls/puts with volume and OI
-  - T211b Implement `computeOptionsFlowSignal()` — detect strikes where volume > 2× OI ("unusual" signal), aggregate bullish/bearish flow
-  - T211c Implement `parseYahooOptionsFlow()` — normalize to `InstitutionalSourceObservation` with confidence based on signal count
-  - T211d Register `yahoo-options-flow` source in `bootstrap.ts` source configs
-- [ ] T212 [P] Implement Yahoo Finance Institutional parser in `realSourceParsers.ts` — replaces Finviz
-  - T212a Implement `fetchYahooInstitutional(ticker)` — fetch quoteSummary from `query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=institutionOwnership`, parse holders count, % held, change
-  - T212b Implement `parseYahooInstitutional()` — normalize to `InstitutionalSourceObservation`, derive inflows/outflows from share change
-  - T212c Register `yahoo-institutional` source in `bootstrap.ts` source configs
-- [ ] T213 [P] Remove mock infrastructure from `bootstrap.ts`:
-  - T213a Remove `createMockInstitutionalFetch()` and `buildMockPayload()` — no longer needed
-  - T213b Remove `createMixedFetch()` — replace with native fetch directly
-  - T213c Remove `unusual-whales` and `finviz-institutional` source configs
-  - T213d Remove `parseUnusualWhales()` and `parseFinvizInstitutional()` from `institutionalDataService.ts`
+- [x] T338 [P] Implement Yahoo Finance Options Flow parser in `yahooOptionsParser.ts` — replaces Unusual Whales
+  - ✅ `fetchYahooOptions(ticker)` — fetch options chain from `query2.finance.yahoo.com/v7/finance/options/{ticker}`, parse calls/puts with volume and OI
+  - ✅ `computeOptionsFlowSignal()` — detect strikes where volume > 2× OI ("unusual" signal), aggregate bullish/bearish flow
+  - ✅ `parseYahooOptionsFlow()` — normalize to `InstitutionalSourceObservation` with confidence based on signal count
+  - ✅ Registered `yahoo-options-flow` source in `bootstrap.ts` source configs
+- [x] T339 [P] Implement Yahoo Finance Institutional parser in `yahooInstitutionalParser.ts` — replaces Finviz
+  - ✅ `fetchYahooInstitutional(ticker)` — fetch quoteSummary from `query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=institutionOwnership`, parse holders count, % held, change
+  - ✅ `parseYahooInstitutional()` — normalize to `InstitutionalSourceObservation`, derive inflows/outflows from share change
+  - ✅ Registered `yahoo-institutional` source in `bootstrap.ts` source configs
+- [x] T340 [P] Remove mock infrastructure from `bootstrap.ts`:
+  - ✅ Removed `createMockInstitutionalFetch()` and `buildMockPayload()` — no longer needed
+  - ✅ Removed `createMixedFetch()` — replaced with native fetch directly
+  - ✅ Removed `unusual-whales` and `finviz-institutional` source configs
+  - ✅ Removed `parseUnusualWhales()` and `parseFinvizInstitutional()` from `institutionalDataService.ts`
 
 ---
 

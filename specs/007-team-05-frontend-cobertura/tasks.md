@@ -15,10 +15,10 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 |--------|------|--------|-----------------|--------|
 | SEC EDGAR 13F | free | ✅ REAL | T334 | `parseSecEdgar13fReal()` |
 | FINRA Short Interest | free | ✅ REAL | T333 | `parseFinraShortInterestReal()` |
-| Yahoo Finance Options Flow | free | ⬜ PENDIENTE | T338 | `parseYahooOptionsFlow()` |
-| Yahoo Finance Institutional | free | ⬜ PENDIENTE | T339 | `parseYahooInstitutional()` |
+| Yahoo Finance Options Flow | free | ✅ REAL | T338 | `parseYahooOptionsFlow()` |
+| Yahoo Finance Institutional | free | ✅ REAL | T339 | `parseYahooInstitutional()` |
 
-> **Nota**: Unusual Whales y Finviz Institutional fueron reemplazados por fuentes gratuitas de Yahoo Finance. Ver T338-T340 para la migración.
+> **Nota**: Unusual Whales y Finviz Institutional fueron reemplazados por fuentes gratuitas de Yahoo Finance. Migración T338-T340 completada.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
@@ -154,26 +154,26 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 
 **Purpose**: Reemplazar las fuentes mock (Unusual Whales, Finviz) por parsers reales gratuitos de Yahoo Finance. Limpiar código legacy de mock.
 
-### Yahoo Finance Parsers
+### Yahoo Finance Parsers (Completado)
 
-- [ ] T338 [P] Implement Yahoo Finance Options Flow parser in `realSourceParsers.ts` — replaces Unusual Whales
-  - T338a Implement `fetchYahooOptions(ticker)` — fetch options chain from `query1.finance.yahoo.com/v7/finance/options/{ticker}`, parse calls/puts with volume and OI
-  - T338b Implement `computeOptionsFlowSignal()` — detect strikes where volume > 2× OI ("unusual" signal), aggregate bullish/bearish flow
-  - T338c Implement `parseYahooOptionsFlow()` — normalize to `InstitutionalSourceObservation` with confidence based on signal count
-  - T338d Register `yahoo-options-flow` source in `bootstrap.ts` source configs
+- [x] T338 [P] Implement Yahoo Finance Options Flow parser in `yahooOptionsParser.ts` — replaces Unusual Whales
+  - ✅ `fetchYahooOptions(ticker)` — fetch options chain from `query2.finance.yahoo.com/v7/finance/options/{ticker}`, parse calls/puts with volume and OI
+  - ✅ `computeOptionsFlowSignal()` — detect strikes where volume > 2× OI ("unusual" signal), aggregate bullish/bearish flow
+  - ✅ `parseYahooOptionsFlow()` — normalize to `InstitutionalSourceObservation` with confidence based on signal count
+  - ✅ Registered `yahoo-options-flow` source in `bootstrap.ts` source configs
 
-- [ ] T339 [P] Implement Yahoo Finance Institutional parser in `realSourceParsers.ts` — replaces Finviz
-  - T339a Implement `fetchYahooInstitutional(ticker)` — fetch quoteSummary from `query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=institutionOwnership`, parse holders count, % held, change
-  - T339b Implement `parseYahooInstitutional()` — normalize to `InstitutionalSourceObservation`, derive inflows/outflows from share change
-  - T339c Register `yahoo-institutional` source in `bootstrap.ts` source configs
+- [x] T339 [P] Implement Yahoo Finance Institutional parser in `yahooInstitutionalParser.ts` — replaces Finviz
+  - ✅ `fetchYahooInstitutional(ticker)` — fetch quoteSummary from `query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=institutionOwnership`, parse holders count, % held, change
+  - ✅ `parseYahooInstitutional()` — normalize to `InstitutionalSourceObservation`, derive inflows/outflows from share change
+  - ✅ Registered `yahoo-institutional` source in `bootstrap.ts` source configs
 
-### Mock Cleanup
+### Mock Cleanup (Completado)
 
-- [ ] T340 [P] Remove mock infrastructure from `bootstrap.ts`:
-  - T340a Remove `createMockInstitutionalFetch()` and `buildMockPayload()` — no longer needed
-  - T340b Remove `createMixedFetch()` — replace with native fetch directly
-  - T340c Remove `parseUnusualWhales()` and `parseFinvizInstitutional()` from `institutionalDataService.ts`
-  - T340d Remove `unusual-whales` and `finviz-institutional` source configs from `buildDefaultSourceConfigs()`
+- [x] T340 [P] Remove mock infrastructure from `bootstrap.ts`:
+  - ✅ Removed `createMockInstitutionalFetch()` and `buildMockPayload()` — no longer needed
+  - ✅ Removed `createMixedFetch()` — replaced with native fetch directly
+  - ✅ Removed `parseUnusualWhales()` and `parseFinvizInstitutional()` from `institutionalDataService.ts`
+  - ✅ Removed `unusual-whales` and `finviz-institutional` source configs from `buildDefaultSourceConfigs()`
 
 ### Documentation
 

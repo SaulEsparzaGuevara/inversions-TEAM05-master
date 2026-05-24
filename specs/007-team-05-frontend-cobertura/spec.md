@@ -104,10 +104,10 @@ Estado actual de las fuentes de datos que alimentan las páginas de Institutiona
 |--------|------|--------|----------|-----------------|
 | SEC EDGAR 13F | free | ✅ REAL | `https://efts.sec.gov` | T334 |
 | FINRA Short Interest | free | ✅ REAL | `https://api.finra.org` | T333 |
-| Yahoo Finance Options Flow | free | ⬜ PENDIENTE | `https://query1.finance.yahoo.com/v7/finance/options` | T338 |
-| Yahoo Finance Institutional | free | ⬜ PENDIENTE | `https://query1.finance.yahoo.com/v10/finance/quoteSummary` | T339 |
+| Yahoo Finance Options Flow | free | ✅ REAL | `https://query2.finance.yahoo.com/v7/finance/options` | T338 |
+| Yahoo Finance Institutional | free | ✅ REAL | `https://query2.finance.yahoo.com/v10/finance/quoteSummary` | T339 |
 
-> **Nota**: Unusual Whales y Finviz Institutional fueron reemplazados por fuentes gratuitas de Yahoo Finance (ver T338-T340). Las fuentes Coverage Strategies y AI Chat no dependen de fuentes externas.
+> **Nota**: Unusual Whales y Finviz Institutional fueron reemplazados por fuentes gratuitas de Yahoo Finance (T338-T340) e implementados completamente. Las fuentes Coverage Strategies y AI Chat no dependen de fuentes externas.
 
 ## Restricciones
 
