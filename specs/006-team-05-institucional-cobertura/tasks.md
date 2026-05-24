@@ -11,10 +11,12 @@ description: "Task list for 006-team-05-institucional-cobertura"
 
 | Fuente | Tier | Estado | Parser |
 |--------|------|--------|--------|
-| SEC EDGAR 13F | free | ⬜ PENDIENTE | `parseSecEdgar13fReal()` (T334) |
-| FINRA Short Interest | free | ⬜ PENDIENTE | `parseFinraShortInterestReal()` (T333) |
+| SEC EDGAR 13F | free | ✅ REAL | `parseSecEdgar13fReal()` (T334) |
+| FINRA Short Interest | free | ✅ REAL | `parseFinraShortInterestReal()` (T333) |
 | Yahoo Finance Options Flow | free | ✅ REAL | `parseYahooOptionsFlow()` (T338) |
 | Yahoo Finance Institutional | free | ✅ REAL | `parseYahooInstitutional()` (T339) |
+
+> **Nota**: Las 4 fuentes están implementadas y operativas con datos reales. Ninguna fuente permanece en estado pendiente.
 
 ## Preserved (Canonical) Tasks
 
@@ -50,30 +52,32 @@ Se incluyen sin omisión todas las tareas canónicas del backlog del equipo, tom
 
 ## Derived Tasks — Implementation & Testing
 
-### Phase 1: Contracts, Persistence & Observability
+### Phase 1: Contracts, Persistence & Observability (Completado)
 
-- [ ] T200 [P] Crear contratos JSON de API para coverage (`specs/006-team-05-institucional-cobertura/contracts/institutional_context.v1.json`, `strategy.v1.json`, `explanation.v1.json`) y ejemplos de payloads
-- [ ] T201 Implementar esquema de persistencia de trazas y evidencias en `backend/src/db/migrations/` (tablas: `institutional_contexts`, `evidence_blobs`, `explanation_responses`) con versión de documento y `response_hash`
-- [ ] T202 [P] Implementar job de purge/retención en `backend/src/jobs/purgeEvidenceJob.ts` — mueve datos older than 365d to archival tier
-- [ ] T203 [P] Implementar métricas e instrumentación en `backend/src/observability/coverageMetrics.ts`: `coverage.response.latency_ms`, `coverage.response.p95_ms`, `coverage.ai.unavailable.count`
-- [ ] T206 [P] Añadir compatibilidad de versionado semántico en contratos y CI validation en `scripts/validate-contract-compat.sh`
-- [ ] T207 Implementar validadores de contratos JSON (ajustando `schema` y `examples`) y tests de compatibilidad en CI
+- [x] T200 [P] Crear contratos JSON de API para coverage (`specs/006-team-05-institucional-cobertura/contracts/institutional_context.v1.json`, `strategy.v1.json`, `explanation.v1.json`) y ejemplos de payloads
+- [x] T201 Implementar esquema de persistencia de trazas y evidencias en `backend/src/db/migrations/` (tablas: `institutional_contexts`, `evidence_blobs`, `explanation_responses`) con versión de documento y `response_hash`
+- [x] T202 [P] Implementar job de purge/retención en `backend/src/jobs/purgeEvidenceJob.ts` — mueve datos older than 365d to archival tier
+- [x] T203 [P] Implementar métricas e instrumentación en `backend/src/observability/coverageMetrics.ts`: `coverage.response.latency_ms`, `coverage.response.p95_ms`, `coverage.ai.unavailable.count`
+- [x] T206 [P] Añadir compatibilidad de versionado semántico en contratos y CI validation en `scripts/validate-contract-compat.sh`
+- [x] T207 Implementar validadores de contratos JSON (ajustando `schema` y `examples`) y tests de compatibilidad en CI
+
+> **Nota**: T206 y T207 estaban pendientes de marcación pero ya existían en el código desde iteraciones anteriores.
 
 ---
 
-### Phase 2: Real Data Source Parsers (SEC & FINRA)
+### Phase 2: Real Data Source Parsers (SEC & FINRA) (Completado)
 
-- [ ] T333 [P] Implement FINRA full-dataset lazy cache in `backend/src/modules/institutional/realSourceParsers.ts` with `ensureFinraCache()` — loads up to 6 pages (×5000 records), shared promise dedup, `Map<string, FinraRecord[]>` at module level
-  - T333a Implement `fetchFinraPage()` with POST to `https://api.finra.org/data/group/otcmarket/name/consolidatedShortInterest`, CSV parsing
-  - T333b Implement module-level `finraCache` + `finraCachePromise` with date boundary detection
-  - T333c Add eager preload kickoff in `bootstrap.ts` — non-blocking `ensureFinraCache().catch(() => {})`
-- [ ] T334 [P] Implement SEC EDGAR real parser in `realSourceParsers.ts` — EFTS search for 13F-HR filings, XML directory enumeration, `informationTable` extraction via regex
-  - T334a Implement `searchEfts(ticker, formType)` using `https://efts.sec.gov/LATEST/search-index`
-  - T334b Implement `extractInfoTableEntries()` regex parser for XML `<infoTable>` blocks
-  - T334c Implement `findXmlWithHoldings()` — iterate XML files in filing directory
-  - T334d Implement `cusipForTicker()` mapping for common tickers
-- [ ] T335 [P] Implement graceful fallback in `parseFinraShortInterestReal` — when ticker not found in cached dataset, return synthetic low-confidence (0.3) observation instead of `null`
-- [ ] T336 Optimize SEC parser performance — reduce `MAX_FILINGS` from 8 to 5, remove artificial `delay(150)` calls, parallelize filing lookups with `Promise.all`
+- [x] T333 [P] Implement FINRA full-dataset lazy cache in `backend/src/modules/institutional/realSourceParsers.ts` with `ensureFinraCache()` — loads up to 6 pages (×5000 records), shared promise dedup, `Map<string, FinraRecord[]>` at module level
+  - ✅ T333a Implement `fetchFinraPage()` with POST to `https://api.finra.org/data/group/otcmarket/name/consolidatedShortInterest`, CSV parsing
+  - ✅ T333b Implement module-level `finraCache` + `finraCachePromise` with date boundary detection
+  - ✅ T333c Add eager preload kickoff in `bootstrap.ts` — non-blocking `ensureFinraCache().catch(() => {})`
+- [x] T334 [P] Implement SEC EDGAR real parser in `realSourceParsers.ts` — EFTS search for 13F-HR filings, XML directory enumeration, `informationTable` extraction via regex
+  - ✅ T334a Implement `searchEfts(ticker, formType)` using `https://efts.sec.gov/LATEST/search-index`
+  - ✅ T334b Implement `extractInfoTableEntries()` regex parser for XML `<infoTable>` blocks
+  - ✅ T334c Implement `findXmlWithHoldings()` — iterate XML files in filing directory
+  - ✅ T334d Implement `cusipForTicker()` mapping — **ampliado de 12 a ~60 tickers del S&P 500** (Fase 4)
+- [x] T335 [P] Implement graceful fallback in `parseFinraShortInterestReal` — when ticker not found in cached dataset, return synthetic low-confidence (0.3) observation instead of `null`
+- [x] T336 Optimize SEC parser performance — reduce `MAX_FILINGS` from 8 to 5, remove artificial `delay(150)` calls, parallelize filing lookups with `Promise.all`
 
 ---
 
@@ -96,14 +100,14 @@ Se incluyen sin omisión todas las tareas canónicas del backlog del equipo, tom
 
 ---
 
-### Phase 4: Resilience, Recovery & Testing
+### Phase 4: Resilience, Recovery & Testing (Completado)
 
-- [ ] T204 Implement fixtures de pruebas A/B/C (nominal, stress tail, low-liquidity) en `tests/fixtures/coverage/` y pipelines CI para ejecutarlos
-- [ ] T205 [P] Implementar el procedimiento de reconstrucción de auditoría (replay) como herramienta interna `tools/reconstruct_explanation.ts` que toma `context_id` y produce audit bundle
-- [ ] T208 [P] Añadir medidas de resiliencia y recovery flows: partial-data handlers, stale-input flags, retry policy for external sources (exponential backoff with max attempts), and circuit-breaker metrics in `backend/src/lib/resilience/`
-- [ ] T214 [P] Implementar upstream source failure degradation según spec 2026-05-22: cuando una fuente falla, incluir `sourceReports[].status = "error"` en la respuesta y continuar con las fuentes disponibles. Si todas fallan, retornar HTTP 503.
-- [ ] T209 Crear playbooks de pruebas de integración y escenarios extremos en `specs/006-team-05-institucional-cobertura/catalogs/market-scenarios.md`
-- [ ] T210 Añadir documentación operativa para Storage & Retention (S3 lifecycle, purge audit) en `ops/docs/retention.md`
+- [x] T204 Implement fixtures de pruebas A/B/C (nominal, stress tail, low-liquidity) en `tests/fixtures/coverage/` y pipelines CI para ejecutarlos
+- [x] T205 [P] Implementar el procedimiento de reconstrucción de auditoría (replay) como herramienta interna `tools/reconstruct_explanation.ts` que toma `context_id` y produce audit bundle
+- [x] T208 [P] Añadir medidas de resiliencia y recovery flows: partial-data handlers, stale-input flags, retry policy for external sources (exponential backoff with max attempts), and circuit-breaker metrics in `backend/src/lib/resilience/` — **módulos implementados + 21 tests unitarios**
+- [x] T214 [P] Implementar upstream source failure degradation según spec 2026-05-22: cuando una fuente falla, incluir `sourceReports[].status = "error"` en la respuesta y continuar con las fuentes disponibles. Si todas fallan, retornar HTTP 503.
+- [x] T209 Crear playbooks de pruebas de integración y escenarios extremos en `specs/006-team-05-institucional-cobertura/catalogs/market-scenarios.md`
+- [x] T210 Añadir documentación operativa para Storage & Retention (S3 lifecycle, purge audit) en `ops/docs/retention.md`
 
 ---
 

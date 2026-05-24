@@ -629,6 +629,18 @@ GEMINI_API_KEY=AIzaSy...
 ### Tests
 
 ```
-npm test → 33 suites, 70+ tests, 0 failures (55 solo institucionales)
+npm test → 32 suites, 158 tests, 0 failures (55 solo institucionales)
 npm run lint → EXIT_CODE: 0
 ```
+
+### Desglose de Tests
+
+| Grupo | Archivos | Tests |
+|-------|----------|-------|
+| Unitarios institucionales | `tests/unit/institutional/` | 12 |
+| Unitarios cobertura | `tests/unit/strategies/coverage/` | 45+ |
+| Unitarios resiliencia | `tests/unit/resilience/` | **21** (nuevos en Fase 3) |
+| Integración institucional | `tests/integration/institutional/` | **18** (nuevos en Fase 5) |
+| Unitarios contratos | `tests/unit/contracts/` | 3+ |
+| Frontend | `tests/` del PWA | varios |
+| **Total** | **32 suites** | **158 tests, 0 fallos** |

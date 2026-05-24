@@ -120,37 +120,37 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 
 ---
 
-## Phase 8: Real Data Sources — SEC EDGAR & FINRA (Cross-Cutting)
+## Phase 8: Real Data Sources — SEC EDGAR & FINRA (Cross-Cutting) (Completado)
 
 **Purpose**: Integrar fuentes de datos reales (SEC EDGAR, FINRA) y documentar semántica de indicadores.
 
 ### Real Source Parsers
 
-- [ ] T333 [P] Implement FINRA full-dataset lazy cache in `realSourceParsers.ts` with `ensureFinraCache()` — loads up to 6 pages (×5000 records), shared promise dedup, `Map<string, FinraRecord[]>` at module level
-  - T333a Implement `fetchFinraPage()` with POST to `https://api.finra.org/data/group/otcmarket/name/consolidatedShortInterest`, CSV parsing
-  - T333b Implement module-level `finraCache` + `finraCachePromise` with date boundary detection
-  - T333c Add eager preload kickoff in `bootstrap.ts` — non-blocking `ensureFinraCache().catch(() => {})`
-- [ ] T334 [P] Implement SEC EDGAR real parser in `realSourceParsers.ts` — EFTS search for 13F-HR filings, XML directory enumeration, `informationTable` extraction via regex
-  - T334a Implement `searchEfts(ticker, formType)` using `https://efts.sec.gov/LATEST/search-index`
-  - T334b Implement `extractInfoTableEntries()` regex parser for XML `<infoTable>` blocks
-  - T334c Implement `findXmlWithHoldings()` — iterate XML files in filing directory
-  - T334d Implement `cusipForTicker()` mapping for common tickers
-- [ ] T335 [P] Implement graceful fallback in `parseFinraShortInterestReal` — when ticker not found in cached dataset, return synthetic low-confidence (0.3) observation instead of `null`
-- [ ] T336 Optimize SEC parser performance — reduce `MAX_FILINGS` from 8 to 5, remove artificial `delay(150)` calls, parallelize filing lookups with `Promise.all`
+- [x] T333 [P] Implement FINRA full-dataset lazy cache in `realSourceParsers.ts` with `ensureFinraCache()` — loads up to 6 pages (×5000 records), shared promise dedup, `Map<string, FinraRecord[]>` at module level
+  - ✅ T333a Implement `fetchFinraPage()` with POST to `https://api.finra.org/data/group/otcmarket/name/consolidatedShortInterest`, CSV parsing
+  - ✅ T333b Implement module-level `finraCache` + `finraCachePromise` with date boundary detection
+  - ✅ T333c Add eager preload kickoff in `bootstrap.ts` — non-blocking `ensureFinraCache().catch(() => {})`
+- [x] T334 [P] Implement SEC EDGAR real parser in `realSourceParsers.ts` — EFTS search for 13F-HR filings, XML directory enumeration, `informationTable` extraction via regex
+  - ✅ T334a Implement `searchEfts(ticker, formType)` using `https://efts.sec.gov/LATEST/search-index`
+  - ✅ T334b Implement `extractInfoTableEntries()` regex parser for XML `<infoTable>` blocks
+  - ✅ T334c Implement `findXmlWithHoldings()` — iterate XML files in filing directory
+  - ✅ T334d Implement `cusipForTicker()` mapping — **ampliado de 12 a ~60 tickers**
+- [x] T335 [P] Implement graceful fallback in `parseFinraShortInterestReal` — when ticker not found in cached dataset, return synthetic low-confidence (0.3) observation instead of `null`
+- [x] T336 Optimize SEC parser performance — reduce `MAX_FILINGS` from 8 to 5, remove artificial `delay(150)` calls, parallelize filing lookups with `Promise.all`
 
 ### Documentation & Semantics
 
-- [ ] T337 [P] Document cost/risk indicator semantics across spec docs:
-  - T337a Add "Indicadores Cost/Risk — Semántica" section to `spec.md`
-  - T337b Add "Real Data Sources" section to `plan.md`
-  - T337c Add `RiskMetrics` conceptual table to `data-model.md`
-  - T337d Add semantic `description` fields to `coverage-compare.schema.json`
-  - T337e Add CHK023 checklist item for cost/risk indicator validation
-  - T337f Create `docs/TEAM-05-cobertura-cost-risk-guide.md` — full explanatory guide
+- [x] T337 [P] Document cost/risk indicator semantics across spec docs:
+  - ✅ T337a Add "Indicadores Cost/Risk — Semántica" section to `spec.md`
+  - ✅ T337b Add "Real Data Sources" section to `plan.md`
+  - ✅ T337c Add `RiskMetrics` conceptual table to `data-model.md`
+  - ✅ T337d Add semantic `description` fields to `coverage-compare.schema.json`
+  - ✅ T337e Add CHK023 checklist item for cost/risk indicator validation
+  - ✅ T337f Create `docs/TEAM-05-cobertura-cost-risk-guide.md` — full explanatory guide
 
 ---
 
-## Phase 9: Yahoo Finance Data Sources & Mock Cleanup
+## Phase 9: Yahoo Finance Data Sources & Mock Cleanup (Completado)
 
 **Purpose**: Reemplazar las fuentes mock (Unusual Whales, Finviz) por parsers reales gratuitos de Yahoo Finance. Limpiar código legacy de mock.
 
@@ -175,13 +175,13 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
   - ✅ Removed `parseUnusualWhales()` and `parseFinvizInstitutional()` from `institutionalDataService.ts`
   - ✅ Removed `unusual-whales` and `finviz-institutional` source configs from `buildDefaultSourceConfigs()`
 
-### Documentation
+### Documentation (Completado)
 
-- [ ] T341 Document Data Source Matrix across spec docs:
-  - T341a Add/update "Data Source Matrix" section in `tasks.md`
-  - T341b Add/update "Data Source Matrix" section in `spec.md`
-  - T341c Add/update "Data Source Matrix" section in `plan.md`
-  - T341d Create `docs/TEAM-05-data-sources.md` — architecture doc with URLs, rate limits, cache TTL, API key requirements
+- [x] T341 Document Data Source Matrix across spec docs:
+  - ✅ T341a Add/update "Data Source Matrix" section in `tasks.md`
+  - ✅ T341b Add/update "Data Source Matrix" section in `spec.md`
+  - ✅ T341c Add/update "Data Source Matrix" section in `plan.md`
+  - ✅ T341d Create `docs/TEAM-05-data-sources.md` — architecture doc with URLs, rate limits, cache TTL, API key requirements
 
 ---
 
