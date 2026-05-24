@@ -20,27 +20,27 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 
 > **Nota**: Unusual Whales y Finviz Institutional fueron reemplazados por fuentes gratuitas de Yahoo Finance. Migración T338-T340 completada.
 
-## Phase 1: Setup (Shared Infrastructure)
+## Phase 1: Setup (Shared Infrastructure) (Completado)
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T300 Install `react-router-dom` in `projects/pwa/inversions_app/package.json`
+- [x] T300 Install `react-router-dom` in `projects/pwa/inversions_app/package.json`
 
 ---
 
-## Phase 2: Foundational (Blocking Prerequisites)
+## Phase 2: Foundational (Blocking Prerequisites) (Completado)
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
-- [ ] T301 Update routing in `projects/pwa/inversions_app/src/main.tsx` to use `BrowserRouter` and wrap routes
-- [ ] T302 [P] Create `projects/pwa/inversions_app/src/layouts/MainLayout.tsx` for shared navigation sidebar + Top Navbar
-- [ ] T303 [P] Implement `ChatState` & `useSyncExternalStore` store in `projects/pwa/inversions_app/src/store/chat.ts` for session persistence
+- [x] T301 Update routing in `projects/pwa/inversions_app/src/main.tsx` to use `BrowserRouter` and wrap routes
+- [x] T302 [P] Create `projects/pwa/inversions_app/src/layouts/MainLayout.tsx` for shared navigation sidebar + Top Navbar
+- [x] T303 [P] Implement `ChatState` & `useSyncExternalStore` store in `projects/pwa/inversions_app/src/store/chat.ts` for session persistence
 
 **Checkpoint**: Foundation ready - user story implementation can now begin.
 
 ---
 
-## Phase 3: [US1] Backend Coverage Endpoints Exposure (RF-301)
+## Phase 3: [US1] Backend Coverage Endpoints Exposure (RF-301) (Completado)
 
 **Goal**: Exponer los motores de estrategia existentes como endpoints REST delegados listos para consumo del frontend.
 
@@ -48,16 +48,16 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 
 ### Implementation for User Story 1
 
-- [ ] T304 [P] [US1] Create thin route POST `/api/coverage/analyze` in `projects/rest-api/inversions_api/src/routes/coverage/analyze.ts`
-- [ ] T305 [P] [US1] Create thin route POST `/api/coverage/compare` in `projects/rest-api/inversions_api/src/routes/coverage/compare.ts`
-- [ ] T306 [US1] Create thin route POST `/api/coverage/simulate` in `projects/rest-api/inversions_api/src/routes/coverage/simulate.ts`
-  - [ ] T306b Mount coverage router (`app.use("/api/coverage", coverageRouter)`) in `projects/rest-api/inversions_api/src/index.ts`
+- [x] T304 [P] [US1] Create thin route POST `/api/coverage/analyze` in `projects/rest-api/inversions_api/src/routes/coverage/analyze.ts`
+- [x] T305 [P] [US1] Create thin route POST `/api/coverage/compare` in `projects/rest-api/inversions_api/src/routes/coverage/compare.ts`
+- [x] T306 [US1] Create thin route POST `/api/coverage/simulate` in `projects/rest-api/inversions_api/src/routes/coverage/simulate.ts`
+  - [x] T306b Mount coverage router (`app.use("/api/coverage", coverageRouter)`) in `projects/rest-api/inversions_api/src/index.ts`
 
 **Checkpoint**: Backend coverage features exposed via REST.
 
 ---
 
-## Phase 4: [US2] Institutional Analysis Page (RF-302)
+## Phase 4: [US2] Institutional Analysis Page (RF-302) (Completado)
 
 **Goal**: Permitir consulta estructurada mediante Ticker, Período y Horizonte visualizando tendencias/zonas S-R.
 
@@ -67,13 +67,13 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 
 ### Implementation for User Story 2
 
-- [ ] T307 [P] [US2] Export API functions for `InstitutionalAnalysisPage` in `projects/pwa/inversions_app/src/services/institutional/institutionalApi.ts` using native fetch and `getAuthHeaders()`
-- [ ] T308 [US2] Implement `projects/pwa/inversions_app/src/pages/institutional/InstitutionalAnalysisPage.tsx` with predefined period/horizon dropdowns
-- [ ] T309 [US2] Link InstitutionalAnalysisPage to `projects/pwa/inversions_app/src/main.tsx` router
+- [x] T307 [P] [US2] Export API functions for `InstitutionalAnalysisPage` in `projects/pwa/inversions_app/src/services/institutional/institutionalApi.ts` using native fetch and `getAuthHeaders()`
+- [x] T308 [US2] Implement `projects/pwa/inversions_app/src/pages/institutional/InstitutionalAnalysisPage.tsx` with predefined period/horizon dropdowns
+- [x] T309 [US2] Link InstitutionalAnalysisPage to `projects/pwa/inversions_app/src/main.tsx` router
 
 ---
 
-## Phase 5: [US3] Regulatory Positions Page (RF-303)
+## Phase 5: [US3] Regulatory Positions Page (RF-303) (Completado)
 
 **Goal**: Tabla 13F consolidada, Flujos, Inflows/Outflows, y métricas de Cache.
 
@@ -83,13 +83,13 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 
 ### Implementation for User Story 3
 
-- [ ] T310 [P] [US3] Add Regulatory Positions fetch methods in `projects/pwa/inversions_app/src/services/institutional/institutionalApi.ts`
-- [ ] T311 [US3] Implement `projects/pwa/inversions_app/src/pages/institutional/RegulatoryPositionsPage.tsx` featuring 13F positions table and flow displays
-- [ ] T312 [US3] Link RegulatoryPositionsPage to `projects/pwa/inversions_app/src/main.tsx` router
+- [x] T310 [P] [US3] Add Regulatory Positions fetch methods in `projects/pwa/inversions_app/src/services/institutional/institutionalApi.ts`
+- [x] T311 [US3] Implement `projects/pwa/inversions_app/src/pages/institutional/RegulatoryPositionsPage.tsx` featuring 13F positions table and flow displays
+- [x] T312 [US3] Link RegulatoryPositionsPage to `projects/pwa/inversions_app/src/main.tsx` router
 
 ---
 
-## Phase 6: [US4] Coverage Strategies & Comparisons (RF-304)
+## Phase 6: [US4] Coverage Strategies & Comparisons (RF-304) (Completado)
 
 **Goal**: Proveer el explorador y payload visualizador de estrategias de cobertura institucionales.
 
@@ -97,14 +97,14 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 
 ### Implementation for User Story 4
 
-- [ ] T313 [P] [US4] Export coverage API methods (analyze, compare, simulate) in `projects/pwa/inversions_app/src/services/coverage/coverageApi.ts`
-- [ ] T314 [US4] Implement `projects/pwa/inversions_app/src/components/coverage/PayoffChart.tsx` utilizing `lightweight-charts`
-- [ ] T315 [US4] Implement `projects/pwa/inversions_app/src/pages/coverage/CoverageStrategiesPage.tsx`, checking edge-case "Option Chains Missing" rendering fallback instead of chart
-- [ ] T316 [US4] Link CoverageStrategiesPage to `projects/pwa/inversions_app/src/main.tsx` router
+- [x] T313 [P] [US4] Export coverage API methods (analyze, compare, simulate) in `projects/pwa/inversions_app/src/services/coverage/coverageApi.ts`
+- [x] T314 [US4] Implement `projects/pwa/inversions_app/src/components/coverage/PayoffChart.tsx` utilizing `lightweight-charts`
+- [x] T315 [US4] Implement `projects/pwa/inversions_app/src/pages/coverage/CoverageStrategiesPage.tsx`, checking edge-case "Option Chains Missing" rendering fallback instead of chart
+- [x] T316 [US4] Link CoverageStrategiesPage to `projects/pwa/inversions_app/src/main.tsx` router
 
 ---
 
-## Phase 7: [US5] AI Institutional Chat (RF-305)
+## Phase 7: [US5] AI Institutional Chat (RF-305) (Completado)
 
 **Goal**: Panel de chat con AI que preserve historial persistente bajo la misma sesión de la pestaña actual.
 
@@ -112,11 +112,11 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 
 ### Implementation for User Story 5
 
-- [ ] T317 [P] [US5] Implement AI Chat endpoints interactions locally in `projects/pwa/inversions_app/src/services/ai/aiChatApi.ts`
-- [ ] T318 [P] [US5] Create `projects/pwa/inversions_app/src/components/ai/ChatHistory.tsx` wrapping the `src/store/chat.ts` `useSyncExternalStore` context
-- [ ] T319 [P] [US5] Create `projects/pwa/inversions_app/src/components/ai/ScenarioAnalysisCards.tsx`
-- [ ] T320 [US5] Implement `projects/pwa/inversions_app/src/pages/ai/AIChatPage.tsx` unifying ChatHistory, polling attempts up to 15 max with `ai_unavailable` manual-retry degradation logic
-- [ ] T321 [US5] Link AIChatPage to `projects/pwa/inversions_app/src/main.tsx` router
+- [x] T317 [P] [US5] Implement AI Chat endpoints interactions locally in `projects/pwa/inversions_app/src/services/ai/aiChatApi.ts`
+- [x] T318 [P] [US5] Create `projects/pwa/inversions_app/src/components/ai/ChatHistory.tsx` wrapping the `src/store/chat.ts` `useSyncExternalStore` context
+- [x] T319 [P] [US5] Create `projects/pwa/inversions_app/src/components/ai/ScenarioAnalysisCards.tsx`
+- [x] T320 [US5] Implement `projects/pwa/inversions_app/src/pages/ai/AIChatPage.tsx` unifying ChatHistory, polling attempts up to 15 max with `ai_unavailable` manual-retry degradation logic
+- [x] T321 [US5] Link AIChatPage to `projects/pwa/inversions_app/src/main.tsx` router
 
 ---
 
