@@ -16,6 +16,15 @@ regulatoryPositionsRouter.get("/positions", async (req, res) => {
     const analysis = buildInstitutionalAnalysisContractFromRequest(req);
     const result = await service.resolve(analysis);
 
+    // Graceful degradation: if no source returned usable data, return 503
+    if (result.overallStatus === "all_failed") {
+      return res.status(503).json({
+        code: "ALL_SOURCES_UNAVAILABLE",
+        message: "No institutional source returned a usable response. All dependent sources are currently unreachable or errored.",
+        sourceReports: result.sourceReports
+      });
+    }
+
     return res.status(200).json({
       request: {
         ticker: result.analysis.ticker,

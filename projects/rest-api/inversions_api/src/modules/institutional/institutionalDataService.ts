@@ -34,7 +34,8 @@ export type InstitutionalSourceStatus =
   | "ok"
   | "cached"
   | "rate_limited"
-  | "failed";
+  | "failed"
+  | "error";
 
 /**
  * Error normalizado por fuente.
@@ -90,6 +91,14 @@ export interface InstitutionalSourceReport {
 }
 
 /**
+ * Estado global de la resolución multi-fuente.
+ * - "ok": todas las fuentes retornaron datos
+ * - "partial": al menos una fuente falló, pero se obtuvo datos de otras
+ * - "all_failed": ninguna fuente retornó datos utilizables
+ */
+export type InstitutionalOverallStatus = "ok" | "partial" | "all_failed";
+
+/**
  * Resultado agregado del servicio.
  */
 export interface InstitutionalDataServiceResult {
@@ -97,6 +106,7 @@ export interface InstitutionalDataServiceResult {
   sourceReports: InstitutionalSourceReport[];
   cacheHit: boolean;
   usedSourceIds: string[];
+  overallStatus: InstitutionalOverallStatus;
 }
 
 /**
@@ -253,7 +263,8 @@ export function isInstitutionalDataServiceResult(value: unknown): value is Insti
     result.sourceReports.every(isInstitutionalSourceReport) &&
     typeof result.cacheHit === "boolean" &&
     Array.isArray(result.usedSourceIds) &&
-    result.usedSourceIds.every(isNonEmptyString)
+    result.usedSourceIds.every(isNonEmptyString) &&
+    (result.overallStatus === "ok" || result.overallStatus === "partial" || result.overallStatus === "all_failed")
   );
 }
 
@@ -279,7 +290,8 @@ export function isInstitutionalSourceReport(value: unknown): value is Institutio
     (report.status === "ok" ||
       report.status === "cached" ||
       report.status === "rate_limited" ||
-      report.status === "failed") &&
+      report.status === "failed" ||
+      report.status === "error") &&
     typeof report.cacheHit === "boolean" &&
     isFiniteNumber(report.latencyMs) &&
     isNonEmptyString(report.fetchedAt) &&
@@ -429,7 +441,7 @@ export class InstitutionalDataService {
           kind: source.kind,
           tier: source.tier,
           enabled: source.enabled,
-          status: "failed",
+          status: "error",
           cacheHit: false,
           latencyMs: this.now() - startedAt,
           fetchedAt: new Date(this.now()).toISOString(),
@@ -438,20 +450,26 @@ export class InstitutionalDataService {
       }
     }
 
-    if (observations.length === 0) {
-      throw new Error(
-        this.buildAggregateFailureMessage(sourceReports)
-      );
-    }
+    const anyDataReturned = observations.length > 0;
+    const analysis = anyDataReturned
+      ? this.mergeObservations(normalizedRequest, observations)
+      : normalizedRequest;
 
-    const analysis = this.mergeObservations(normalizedRequest, observations);
     const cacheHit = sourceReports.every((report) => report.status === "cached");
+    const allOk = sourceReports.every((r) => r.status === "ok" || r.status === "cached");
+
+    const overallStatus: InstitutionalOverallStatus = !anyDataReturned
+      ? "all_failed"
+      : allOk
+        ? "ok"
+        : "partial";
 
     return {
       analysis,
       sourceReports,
       cacheHit,
-      usedSourceIds: observations.map((observation) => observation.sourceId)
+      usedSourceIds: observations.map((observation) => observation.sourceId),
+      overallStatus
     };
   }
 

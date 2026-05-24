@@ -26,6 +26,16 @@ institutionalAnalysisRouter.get("/analysis", async (req, res) => {
 
     const groupedZones = groupInstitutionalZones(zoneResult.zones);
 
+    // Graceful degradation: if no source returned usable data, return 503
+    if (zoneResult.overallStatus === "all_failed") {
+      return res.status(503).json({
+        code: "ALL_SOURCES_UNAVAILABLE",
+        message: "No institutional source returned a usable response. All dependent sources are currently unreachable or errored.",
+        sourceReports: zoneResult.sourceReports,
+        generatedAt: zoneResult.generatedAt
+      });
+    }
+
     return res.status(200).json({
       request: {
         ticker: zoneResult.analysis.ticker,

@@ -74,7 +74,8 @@ describe("institutional zones engine", () => {
           }
         ],
         cacheHit: false,
-        usedSourceIds: ["sec-edgar-13f"]
+        usedSourceIds: ["sec-edgar-13f"],
+        overallStatus: "ok"
       })
     };
 

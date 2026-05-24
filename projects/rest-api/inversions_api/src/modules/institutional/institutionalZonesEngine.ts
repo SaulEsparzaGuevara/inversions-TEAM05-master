@@ -58,6 +58,7 @@ export interface InstitutionalZonesResult {
   candlesAnalyzed: number;
   sourceReports: InstitutionalSourceReport[];
   generatedAt: string;
+  overallStatus: "ok" | "partial" | "all_failed";
 }
 
 /**
@@ -165,7 +166,8 @@ export function isInstitutionalZonesResult(value: unknown): value is Institution
     result.candlesAnalyzed >= 0 &&
     Array.isArray(result.sourceReports) &&
     result.sourceReports.every(isInstitutionalSourceReport) &&
-    isNonEmptyString(result.generatedAt)
+    isNonEmptyString(result.generatedAt) &&
+    (result.overallStatus === "ok" || result.overallStatus === "partial" || result.overallStatus === "all_failed")
   );
 }
 
@@ -239,7 +241,8 @@ export class InstitutionalZonesEngine {
       zones: rankedZones,
       candlesAnalyzed: candles.length,
       sourceReports: institutionalResult.sourceReports,
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
+      overallStatus: institutionalResult.overallStatus
     });
   }
 
