@@ -160,8 +160,8 @@ Obtiene posiciones cortas consolidadas desde la API REST de FINRA. Usa un cache 
 | `baseUrl` | `https://api.finra.org` |
 | `path` | `/data/group/otcmarket/name/consolidatedShortInterest` |
 | `priority` | 2 |
-| `cacheTtlMs` | 300,000 (5 minutos) |
-| `rateLimitPerMinute` | 30 |
+| `cacheTtlMs` | 600,000 (10 minutos) |
+| `rateLimitPerMinute` | 10 |
 | Parser | `parseFinraShortInterestReal()` |
 
 ### Flujo de ejecución
@@ -237,7 +237,7 @@ Reemplaza **Unusual Whales** (API paga). Obtiene la cadena de opciones desde la 
 | `path` | `/v7/finance/options/{ticker}` |
 | `priority` | 3 |
 | `cacheTtlMs` | 120,000 (2 minutos) |
-| `rateLimitPerMinute` | 30 |
+| `rateLimitPerMinute` | 20 |
 | Parser | `parseYahooOptionsFlow()` (en `yahooOptionsParser.ts`) |
 
 ### Autenticación (Crumb)
@@ -300,8 +300,8 @@ Reemplaza **Finviz Institutional** (API no oficial, scraping frágil). Obtiene t
 | `baseUrl` | `https://query2.finance.yahoo.com` |
 | `path` | `/v10/finance/quoteSummary/{ticker}` |
 | `priority` | 4 (menos prioritario) |
-| `cacheTtlMs` | 600,000 (10 minutos) |
-| `rateLimitPerMinute` | 10 |
+| `cacheTtlMs` | 300,000 (5 minutos) |
+| `rateLimitPerMinute` | 20 |
 | Parser | `parseYahooInstitutional()` (en `yahooInstitutionalParser.ts`) |
 
 ### Flujo de ejecución
@@ -387,8 +387,8 @@ Se computa automáticamente:
 | **Tipo de dato** | Holdings 13F | Short interest | Options flow | Institutional ownership |
 | **Frecuencia** | Trimestral | Quincenal | Tiempo real | Tiempo real |
 | **API Key** | No | No | No (crumb auth) | No (crumb auth) |
-| **Caché (TTL)** | 10 min | 5 min | 2 min | 10 min |
-| **Rate limit** | 10 req/min | 30 req/min | 30 req/min | 10 req/min |
+| **Caché (TTL)** | 10 min | 10 min | 2 min | 5 min |
+| **Rate limit** | 10 req/min | 10 req/min | 20 req/min | 20 req/min |
 | **Prioridad** | 1 (alta) | 2 | 3 | 4 (baja) |
 | **Timeout** | 12s | 12s | 12s | 12s |
 | **Fallback** | null → error | sintético 0.3 | sintético 0.3 | sintético 0.3 |
