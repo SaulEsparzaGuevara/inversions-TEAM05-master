@@ -18,7 +18,9 @@ export type InstitutionalSourceKind =
   | "sec_edgar_13f"
   | "finra_short_interest"
   | "unusual_whales"
-  | "finviz_institutional";
+  | "finviz_institutional"
+  | "yahoo_options_flow"
+  | "yahoo_institutional";
 
 /**
  * Nivel de acceso de la fuente.
@@ -197,7 +199,9 @@ export function isInstitutionalSourceConfig(value: unknown): value is Institutio
     (source.kind === "sec_edgar_13f" ||
       source.kind === "finra_short_interest" ||
       source.kind === "unusual_whales" ||
-      source.kind === "finviz_institutional") &&
+      source.kind === "finviz_institutional" ||
+      source.kind === "yahoo_options_flow" ||
+      source.kind === "yahoo_institutional") &&
     isNonEmptyString(source.label) &&
     typeof source.enabled === "boolean" &&
     (source.tier === "free" || source.tier === "paid") &&
@@ -221,7 +225,9 @@ export function isInstitutionalSourceObservation(value: unknown): value is Insti
     (observation.kind === "sec_edgar_13f" ||
       observation.kind === "finra_short_interest" ||
       observation.kind === "unusual_whales" ||
-      observation.kind === "finviz_institutional") &&
+      observation.kind === "finviz_institutional" ||
+      observation.kind === "yahoo_options_flow" ||
+      observation.kind === "yahoo_institutional") &&
     isNonEmptyString(observation.ticker) &&
     isNonEmptyString(observation.asOf) &&
     isFiniteNumber(observation.confidence) &&
@@ -265,7 +271,9 @@ export function isInstitutionalSourceReport(value: unknown): value is Institutio
     (report.kind === "sec_edgar_13f" ||
       report.kind === "finra_short_interest" ||
       report.kind === "unusual_whales" ||
-      report.kind === "finviz_institutional") &&
+      report.kind === "finviz_institutional" ||
+      report.kind === "yahoo_options_flow" ||
+      report.kind === "yahoo_institutional") &&
     (report.tier === "free" || report.tier === "paid") &&
     typeof report.enabled === "boolean" &&
     (report.status === "ok" ||
@@ -294,7 +302,9 @@ export function isInstitutionalSourceError(value: unknown): value is Institution
     (error.kind === "sec_edgar_13f" ||
       error.kind === "finra_short_interest" ||
       error.kind === "unusual_whales" ||
-      error.kind === "finviz_institutional") &&
+      error.kind === "finviz_institutional" ||
+      error.kind === "yahoo_options_flow" ||
+      error.kind === "yahoo_institutional") &&
     isNonEmptyString(error.code) &&
     isNonEmptyString(error.message) &&
     typeof error.retryable === "boolean" &&
@@ -546,6 +556,10 @@ export class InstitutionalDataService {
         return this.parseUnusualWhales.bind(this);
       case "finviz_institutional":
         return this.parseFinvizInstitutional.bind(this);
+      case "yahoo_options_flow":
+        return this.parseYahooOptionsFlow.bind(this);
+      case "yahoo_institutional":
+        return this.parseYahooInstitutional.bind(this);
     }
   }
 
@@ -652,6 +666,94 @@ export class InstitutionalDataService {
         notional: this.extractNumber(payload, [["notional"], ["openPositionsNotional"]])
       },
       notes: ["Finviz institutional normalized"]
+    });
+  }
+
+  private parseYahooOptionsFlow(
+    payload: unknown,
+    request: InstitutionalAnalysisContract,
+    source: InstitutionalSourceConfig
+  ): InstitutionalSourceObservation | null {
+    const optionChain = this.extractValue(payload, [["optionChain", "result", "0"]]);
+    const options = optionChain && typeof optionChain === "object"
+      ? (optionChain as Record<string, unknown>)["options"]
+      : undefined;
+    const firstExpiration = Array.isArray(options) && options.length > 0
+      ? options[0]
+      : undefined;
+    const calls = firstExpiration && typeof firstExpiration === "object"
+      ? (firstExpiration as Record<string, unknown>)["calls"]
+      : undefined;
+    const puts = firstExpiration && typeof firstExpiration === "object"
+      ? (firstExpiration as Record<string, unknown>)["puts"]
+      : undefined;
+
+    const callVolume = Array.isArray(calls)
+      ? (calls as Record<string, unknown>[]).reduce((sum, c) => sum + (typeof c.volume === "number" ? c.volume : 0), 0)
+      : 0;
+    const putVolume = Array.isArray(puts)
+      ? (puts as Record<string, unknown>[]).reduce((sum, p) => sum + (typeof p.volume === "number" ? p.volume : 0), 0)
+      : 0;
+    const callOi = Array.isArray(calls)
+      ? (calls as Record<string, unknown>[]).reduce((sum, c) => sum + (typeof c.openInterest === "number" ? c.openInterest : 0), 0)
+      : 0;
+    const putOi = Array.isArray(puts)
+      ? (puts as Record<string, unknown>[]).reduce((sum, p) => sum + (typeof p.openInterest === "number" ? p.openInterest : 0), 0)
+      : 0;
+
+    const totalVolume = callVolume + putVolume;
+    const putCallVolumeRatio = putVolume > 0 ? callVolume / putVolume : 1;
+    const putCallOiRatio = putOi > 0 ? callOi / putOi : 1;
+
+    return this.buildObservationFromPayload(source, request, payload, {
+      volume: totalVolume > 0 ? totalVolume : undefined,
+      flows: {
+        inflows: callVolume,
+        outflows: putVolume
+      },
+      openPositions: {
+        count: callOi + putOi
+      },
+      notes: [`Yahoo Options Flow: ${callVolume} call vol, ${putVolume} put vol, P/C vol ratio ${putCallVolumeRatio.toFixed(2)}, P/C OI ratio ${putCallOiRatio.toFixed(2)}`]
+    });
+  }
+
+  private parseYahooInstitutional(
+    payload: unknown,
+    request: InstitutionalAnalysisContract,
+    source: InstitutionalSourceConfig
+  ): InstitutionalSourceObservation | null {
+    const quoteSummary = this.extractValue(payload, [["quoteSummary", "result", "0"]]);
+    const institutionOwnership = quoteSummary && typeof quoteSummary === "object"
+      ? (quoteSummary as Record<string, unknown>)["institutionOwnership"]
+      : undefined;
+    const ownershipList = institutionOwnership && typeof institutionOwnership === "object"
+      ? (institutionOwnership as Record<string, unknown>)["ownershipList"]
+      : undefined;
+
+    const holders: Array<Record<string, unknown>> = Array.isArray(ownershipList)
+      ? ownershipList as Record<string, unknown>[]
+      : [];
+
+    const totalHeld = holders.reduce((sum, h) => sum + (typeof h.position === "number" ? h.position : 0), 0);
+    const totalChange = holders.reduce((sum, h) => sum + (typeof h.change === "number" ? h.change : 0), 0);
+
+    const fundsOwnershipPct = this.extractNumber(payload, [
+      ["quoteSummary", "result", "0", "institutionOwnership", "ownershipList", "0", "pctHeld"],
+      ["quoteSummary", "result", "0", "majorHoldersBreakdown", "institutionsPercentHeld"]
+    ]);
+
+    return this.buildObservationFromPayload(source, request, payload, {
+      fundsOwnershipPct: fundsOwnershipPct,
+      volume: totalHeld > 0 ? totalHeld : undefined,
+      flows: {
+        inflows: totalChange > 0 ? totalChange : 0,
+        outflows: totalChange < 0 ? Math.abs(totalChange) : 0
+      },
+      openPositions: {
+        count: holders.length
+      },
+      notes: [`Yahoo Institutional: ${holders.length} holders, ${totalHeld.toLocaleString()} shares held total`]
     });
   }
 

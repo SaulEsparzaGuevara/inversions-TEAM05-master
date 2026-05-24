@@ -36,6 +36,12 @@ import {
   parseFinraShortInterestReal,
   ensureFinraCache
 } from "../../modules/institutional/realSourceParsers.js";
+import {
+  parseYahooOptionsFlow
+} from "../../modules/institutional/yahooOptionsParser.js";
+import {
+  parseYahooInstitutional
+} from "../../modules/institutional/yahooInstitutionalParser.js";
 
 type InstitutionalRouteContext = {
   service: InstitutionalDataService;
@@ -296,28 +302,30 @@ function buildDefaultSourceConfigs(): InstitutionalSourceConfig[] {
       parser: parseFinraShortInterestReal as unknown as InstitutionalSourceParser
     },
     {
-      sourceId: "unusual-whales",
-      kind: "unusual_whales",
-      label: "Unusual Whales",
-      enabled: true,
-      tier: "paid",
-      baseUrl: "https://institutional.mock",
-      path: "/mock/unusual-whales",
-      priority: 3,
-      cacheTtlMs: 120_000,
-      rateLimitPerMinute: 30
-    },
-    {
-      sourceId: "finviz-institutional",
-      kind: "finviz_institutional",
-      label: "Finviz Institutional",
+      sourceId: "yahoo-options-flow",
+      kind: "yahoo_options_flow",
+      label: "Yahoo Options Flow",
       enabled: true,
       tier: "free",
-      baseUrl: "https://institutional.mock",
-      path: "/mock/finviz-institutional",
-      priority: 4,
+      baseUrl: "https://query2.finance.yahoo.com",
+      path: "/v7/finance/options",
+      priority: 3,
       cacheTtlMs: 120_000,
-      rateLimitPerMinute: 30
+      rateLimitPerMinute: 20,
+      parser: parseYahooOptionsFlow
+    },
+    {
+      sourceId: "yahoo-institutional",
+      kind: "yahoo_institutional",
+      label: "Yahoo Institutional",
+      enabled: true,
+      tier: "free",
+      baseUrl: "https://query2.finance.yahoo.com",
+      path: "/v10/finance/quoteSummary",
+      priority: 4,
+      cacheTtlMs: 300_000,
+      rateLimitPerMinute: 20,
+      parser: parseYahooInstitutional
     }
   ];
 }
