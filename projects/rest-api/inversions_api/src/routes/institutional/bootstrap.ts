@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * bootstrap.ts
+ * ============================================================================
+ *
+ * FIC: T340: Bootstrap — singleton factory creating InstitutionalDataService with 4 real sources, zones/trend/expiration engines, and source configs (priorities, rate-limits, TTLs).
+ */
+
 import type { Request } from "express";
 import {
   createInstitutionalAnalysisContract,
@@ -273,6 +281,32 @@ export function buildInstitutionalPositionsSummary(result: InstitutionalDataServ
   };
 }
 
+/**
+ * Construye las configuraciones por defecto de las 4 fuentes institucionales.
+ *
+ * ESTRATEGIA DE PRIORIDADES:
+ * - priority 1 (SEC EDGAR): La fuente más autoritativa (filings regulatorios reales).
+ *   Pero es lenta (EFTS + XML parsing), por eso se intenta primero.
+ * - priority 2 (FINRA): También regulatoria, pero requiere precarga completa
+ *   del dataset (ensureFinraCache). Tiene cache propio.
+ * - priority 3 (Yahoo Options): API gratuita sin autenticación formal.
+ *   Rápida pero menos confiable que fuentes regulatorias.
+ * - priority 4 (Yahoo Institutional): Similar a options, pero con rate limit
+ *   más restrictivo.
+ *
+ * POR QUÉ cacheTtlMs DIFERENTES:
+ * - SEC/FINRA (10 min): Datos regulatorios cambian lentamente (semanal/mensual).
+ * - Yahoo Options (2 min): Opciones cambian minuto a minuto.
+ * - Yahoo Institutional (5 min): Holdings cambian trimestralmente, pero el
+ *   crumb session expira cada 15 min.
+ *
+ * POR QUÉ rateLimitPerMinute:
+ * - Yahoo (20/min): APIs no oficiales — superar este límite puede resultar
+ *   en bloqueo de IP. 20/min es conservador.
+ * - SEC (10/min): SEC tiene rate limiting estricto y requiere User-Agent
+ *   identificable.
+ * - FINRA (10/min): Similar a SEC, aunque usa POST con CSV response.
+ */
 function buildDefaultSourceConfigs(): InstitutionalSourceConfig[] {
   return [
     {
@@ -368,10 +402,31 @@ function normalizeIdentifier(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 32);
 }
 
+/**
+ * Genera una semilla determinista a partir del ticker.
+ *
+ * POR QUÉ SUMAR CHARCODES: Queremos que el mismo ticker produzca SIEMPRE
+ * los mismos valores sintéticos (determinista), pero tickers distintos
+ * produzcan valores diferentes. Sumar los charCodes de cada letra del
+ * ticker logra esto sin necesidad de un RNG con semilla.
+ * Ejemplo: "SPY" = 83('S') + 80('P') + 89('Y') = 252
+ */
 function buildTickerSeed(ticker: string): number {
   return ticker.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
 }
 
+/**
+ * Factor multiplicador según el período seleccionado.
+ *
+ * POR QUÉ ESTOS VALORES: Períodos más largos (quarterly) deberían mostrar
+ * mayor acumulación de volumen y flujos que períodos cortos (intraday).
+ * Los factores se calibraron para que quarterly ≈ 2× intraday.
+ * - intraday: 0.75 (menor actividad)
+ * - daily: 1.0 (línea base)
+ * - weekly: 1.18
+ * - monthly: 1.38
+ * - quarterly: 1.58 (mayor acumulación)
+ */
 function getPeriodFactor(period: InstitutionalAnalysisPeriod): number {
   switch (period) {
     case "intraday":
@@ -387,6 +442,15 @@ function getPeriodFactor(period: InstitutionalAnalysisPeriod): number {
   }
 }
 
+/**
+ * Factor multiplicador según el horizonte de inversión.
+ *
+ * POR QUÉ: Horizontes más largos implican mayor capital comprometido
+ * y por tanto mayor exposición institucional.
+ * - short: 0.9 (menor exposición)
+ * - medium: 1.0 (línea base)
+ * - long: 1.12 (mayor exposición)
+ */
 function getHorizonFactor(horizon: InstitutionalHorizon): number {
   switch (horizon) {
     case "short":

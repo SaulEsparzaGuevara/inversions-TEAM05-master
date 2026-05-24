@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * protectivePutEngine.ts
+ * ============================================================================
+ *
+ * FIC: T114/T114b: Protective Put and Married Put Engines — computes payoff (simplified BS), risk metrics, and alerts for put-protected long positions.
+ */
+
 import { createCoverageStrategyContract, type CoverageStrategyContract } from "./coverageStrategyContract.js";
 import {
   clamp01,
@@ -19,7 +27,15 @@ export class ProtectivePutEngine {
   private readonly earlyExerciseWindowDays: number;
 
   constructor(options: ProtectivePutEngineOptions = {}) {
+    // stopLossBufferPct = 3% por debajo del strike del put.
+    // POR QUÉ 3%: Es un buffer suficiente para evitar falsos positivos
+    // por volatilidad intradía, pero lo suficientemente ajustado para
+    // activar la alerta antes de que el put pierda su protección efectiva.
     this.stopLossBufferPct = options.stopLossBufferPct ?? 0.03;
+    // earlyExerciseWindowDays = 21 días antes de expiración.
+    // POR QUÉ 21: Es ~1 mes de trading. Cuando un put está deep ITM
+    // y cerca de expirar, aumenta el riesgo de ejercicio anticipado
+    // (asignación). 21 días da tiempo para hacer roll o cerrar la posición.
     this.earlyExerciseWindowDays = options.earlyExerciseWindowDays ?? 21;
   }
 
@@ -101,6 +117,20 @@ export class ProtectivePutEngine {
     return toContractScale(strategy.shares, contractMultiplier);
   }
 
+  /**
+   * Calcula la prima neta POR ACCIÓN de la estrategia.
+   *
+   * POR QUÉ signedPremium (long = positivo, short = negativo):
+   * En opciones, comprar (long) significa pagar prima (costo), mientras que
+   * vender (short) significa recibir prima (ingreso). Para calcular el costo
+   * neto, las primas de patas largas son positivas (gasto) y las de patas
+   * cortas son negativas (ingreso).
+   *
+   * POR QUÉ toContractScale: Las primas de opciones cotizan POR CONTRATO
+   * (100 acciones). Si el usuario tiene 500 acciones pero la opción es
+   * estándar (100), se necesitan 5 contratos. toContractScale normaliza
+   * esto dividiendo shares / multiplier.
+   */
   private calculateNetPremiumPerShare(strategy: CoverageStrategyContract): number {
     const premiumSum = strategy.legs.reduce((sum, leg) => {
       const legScale = toContractScale(strategy.shares, leg.multiplier);

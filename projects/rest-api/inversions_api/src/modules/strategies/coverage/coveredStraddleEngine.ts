@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * coveredStraddleEngine.ts
+ * ============================================================================
+ *
+ * FIC: T116: Covered Straddle Engine — computes unlimited-risk payoff, margin metrics, and stress alerts for straddle on owned shares.
+ */
+
 import { createCoverageStrategyContract, type CoverageStrategyContract } from "./coverageStrategyContract.js";
 import {
   clamp01,

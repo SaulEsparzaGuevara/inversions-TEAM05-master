@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * coverageMetrics.ts
+ * ============================================================================
+ *
+ * FIC: T203: Coverage Metrics — telemetry for coverage module: trackAnalysis, trackComparison, getMetrics.
+ */
+
 type Tags = { flow?: string; endpoint?: string; region?: string };
 
 const METRICS = {

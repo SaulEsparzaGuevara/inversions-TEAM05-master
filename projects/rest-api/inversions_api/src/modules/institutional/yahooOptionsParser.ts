@@ -87,8 +87,22 @@ interface YahooOptionsChainResponse {
 // ---------------------------------------------------------------------------
 
 /**
- * Obtains a crumb + cookie pair from Yahoo Finance.
- * Uses module-level shared-promise dedup (same pattern as ensureFinraCache).
+ * Obtiene un par crumb + cookie de Yahoo Finance.
+ *
+ * POR QUÉ CRUMB AUTH: Yahoo Finance requiere autenticación por crumb para
+ * sus APIs no oficiales (v7/v10). Sin crumb, las requests devuelven HTTP 401.
+ * El flujo es:
+ * 1. GET a fc.yahoo.com → obtener cookie de sesión
+ * 2. GET a v1/test/getcrumb con la cookie → obtener crumb token
+ * 3. Incluir crumb como query param en todas las requests subsiguientes
+ *
+ * POR QUÉ SHARED-PROMISE DEDUP (ensureCrumbSession): Múltiples parsers
+ * (options + institutional) pueden solicitar crumb simultáneamente. El patrón
+ * de shared-promise asegura que solo se haga UNA llamada de autenticación,
+ * evitando rate limiting innecesario.
+ *
+ * POR QUÉ TTL DE 15 MIN: La cookie de Yahoo expira aproximadamente a los
+ * 20-30 min. Usamos 15 min para tener margen de seguridad.
  */
 async function ensureCrumbSession(): Promise<CrumbSession> {
   if (crumbSession && crumbSession.expiresAt > Date.now()) {
@@ -100,16 +114,22 @@ async function ensureCrumbSession(): Promise<CrumbSession> {
   }
 
   crumbSessionPromise = (async () => {
-    // Step 1: get a cookie from fc.yahoo.com
+    // PASO 1: Obtener cookie de sesión desde fc.yahoo.com.
+    // redirect: "manual" porque Yahoo redirige a una página principal;
+    // nos interesa solo el header Set-Cookie de la respuesta inicial.
     const cookieResp = await fetch(YAHOO_COOKIE_URL, {
       headers: YAHOO_HEADERS,
       redirect: "manual"
     });
     const setCookieHeader = cookieResp.headers.get("set-cookie") ?? "";
+    // Extrae solo el primer par nombre=valor (ej: "B=abc123") ignorando
+    // parámetros adicionales como path, domain, expires.
     const cookieMatch = setCookieHeader.match(/[A-Za-z0-9]+=[A-Za-z0-9]+/);
     const cookie = cookieMatch ? cookieMatch[0] : "";
 
-    // Step 2: get a crumb using that cookie
+    // PASO 2: Canjear la cookie por un crumb token.
+    // El crumb es un string corto que se pasa como query param ?crumb=xxx
+    // en todas las requests a las APIs v7/v10 de Yahoo.
     const crumbResp = await fetch(YAHOO_CRUMB_URL, {
       headers: {
         ...YAHOO_HEADERS,
@@ -214,7 +234,12 @@ function computeOptionsFlowSignal(result: YahooOptionsResult): OptionsFlowSignal
     for (const call of expiration.calls) {
       callVolume += call.volume || 0;
       callOi += call.openInterest || 0;
-      // Detect unusual volume: volume > 2x open interest
+      // Detección de volumen "inusual": volumen > 2× open interest.
+      // POR QUÉ 2× OI: Es el umbral estándar en análisis de opciones
+      // (unusual options activity). Cuando el volumen de trading de un
+      // strike duplica su open interest, sugiere que hay nueva liquidez
+      // entrando — posible señal de smart money o cobertura institucional.
+      // Fuente: patrones usados por Unusual Whales, FlowAlgo, etc.
       if (call.volume > 0 && call.openInterest > 0 && call.volume > call.openInterest * 2) {
         unusualStrikeCount++;
       }

@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * collarEngine.ts
+ * ============================================================================
+ *
+ * FIC: T115: Collar Engine — computes capped payoff, net premium (debit/credit), risk metrics, and alerts for collar strategies (long put + short call).
+ */
+
 import { createCoverageStrategyContract, type CoverageStrategyContract } from "./coverageStrategyContract.js";
 import {
   clamp01,
@@ -17,6 +25,10 @@ export class CollarEngine {
   private readonly stopLossBufferPct: number;
 
   constructor(options: CollarEngineOptions = {}) {
+    // stopLossBufferPct = 4%. Ligeramente mayor que en protective put (3%)
+    // porque el collar tiene DOS bandas (put y call) que requieren más
+    // margen antes de activar alertas. 4% evita falsos positivos en ambas
+    // direcciones.
     this.stopLossBufferPct = options.stopLossBufferPct ?? 0.04;
   }
 
@@ -155,6 +167,20 @@ export class CollarEngine {
     return rangeWidth / Math.max(0.01, Math.abs(netPremiumPerShare));
   }
 
+  /**
+   * Calcula el riesgo de ejercicio anticipado para un collar.
+   *
+   * POR QUÉ COMBINA DOWNSIDE + UPSIDE: En un collar, ambas patas pueden
+   * ser ejercidas anticipadamente:
+   * - Si el precio cae muy por debajo del put strike → riesgo de ejercicio
+   *   del put (asignación de acciones).
+   * - Si el precio sube muy por encima del call strike → riesgo de
+   *   asignación de la call corta (te quitan las acciones).
+   *
+   * Cada lado contribuye con 0.6 (60%) al score total, lo que significa
+   * que si solo un lado está estresado, el score máximo es 0.6. Si ambos
+   * lados están estresados, puede llegar a 1.0.
+   */
   private calculateExerciseRisk(currentPrice: number, putStrike: number, callStrike: number): number {
     const downside = Math.max(0, putStrike - currentPrice) / Math.max(1, putStrike);
     const upside = Math.max(0, currentPrice - callStrike) / Math.max(1, callStrike);

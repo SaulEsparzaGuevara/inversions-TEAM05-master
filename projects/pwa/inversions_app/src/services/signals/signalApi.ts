@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * signalApi.ts
+ * ============================================================================
+ *
+ * FIC: Signal API placeholder — getSignals GET /api/signals for future trading signal integration.
+ */
+
 export type SignalDirection = "BUY" | "SELL" | "HOLD";
 
 export interface SourceVerdict {

@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * coverageStrategyAdapter.ts
+ * ============================================================================
+ *
+ * FIC: T173: Coverage Strategy Adapter — transforms engine results into standard StrategyOutput format.
+ */
+
 import crypto from "node:crypto";
 import {
   ConfidenceLevel,

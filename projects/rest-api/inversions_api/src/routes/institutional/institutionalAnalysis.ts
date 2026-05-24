@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * institutionalAnalysis.ts
+ * ============================================================================
+ *
+ * FIC: T111: Institutional Analysis Route — GET /api/institutional/analysis returning zones, trends, metrics, catalyst windows and per-source sourceReports.
+ */
+
 import { Router } from "express";
 import { authContextMiddleware } from "../../middleware/authContext.js";
 import {

@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * coverageComparator.ts
+ * ============================================================================
+ *
+ * FIC: T120: Coverage Comparator — ranks 4 strategies (protective put, married put, collar, covered straddle) by composite score and recommends best.
+ */
+
 import { CoverageSimulationEngine } from "./coverageSimulationEngine.js";
 import { CoverageRiskService } from "./coverageRiskService.js";
 import { CoverageReportService } from "./coverageReportService.js";

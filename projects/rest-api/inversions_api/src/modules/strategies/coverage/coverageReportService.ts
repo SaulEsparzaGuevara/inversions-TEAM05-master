@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * coverageReportService.ts
+ * ============================================================================
+ *
+ * FIC: T119: Coverage Report Service — combines strategy result, simulation, risk into reports with winRate, R/R ratio.
+ */
+
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createCoverageStrategyContract, type CoverageStrategyContract } from "./coverageStrategyContract.js";

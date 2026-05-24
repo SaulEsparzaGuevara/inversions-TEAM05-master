@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * ScenarioAnalysisCards.tsx
+ * ============================================================================
+ *
+ * FIC: Scenario analysis cards — renders Gemini markdown response as visual cards.
+ */
+
 import React from "react";
 import type { ScenarioAnalysisItem } from "../../services/ai/aiChatApi";
 

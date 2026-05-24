@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * MainLayout.tsx
+ * ============================================================================
+ *
+ * FIC: Main layout with responsive sidebar navigation linking to Dashboard + 4 pages.
+ */
+
 import React from "react";
 import { Outlet, Link } from "react-router-dom";
 

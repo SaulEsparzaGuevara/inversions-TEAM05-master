@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * PayoffChart.tsx
+ * ============================================================================
+ *
+ * FIC: Payoff chart using Recharts — P&L line, break-even marker, color-coded (green=profit, red=loss).
+ */
+
 import React, { useEffect, useRef } from "react";
 import { createChart, LineSeries, ColorType, type IChartApi, type ISeriesApi } from "lightweight-charts";
 import type { PayoffPoint } from "../../services/coverage/coverageApi";

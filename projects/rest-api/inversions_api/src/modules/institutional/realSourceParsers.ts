@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * realSourceParsers.ts
+ * ============================================================================
+ *
+ * FIC: T107b: Real Source Parsers — SEC EDGAR 13F (EFTS + XML) and FINRA Short Interest (REST) parsing with CUSIP mapping and cache preloading.
+ */
+
 import {
   type InstitutionalAnalysisContract
 } from "./institutionalContract.js";
@@ -6,6 +14,9 @@ import {
   type InstitutionalSourceConfig
 } from "./institutionalDataService.js";
 
+// User-Agent obligatorio para SEC EDGAR. La SEC BLOQUEA requests sin
+// User-Agent identificable (política de seguridad del sitio).
+// Se puede sobreescribir via EDGAR_USER_AGENT en .env.
 const EDGAR_USER_AGENT = process.env.EDGAR_USER_AGENT ?? "TurboPapus/1.0 (contact@turbopapus.com)";
 
 const JSON_HEADERS = {
@@ -93,6 +104,20 @@ async function findXmlWithHoldings(cik: number, adsh: string, dirItems: { name: 
   return null;
 }
 
+/**
+ * Mapea tickers a CUSIP para búsqueda en filings 13F.
+ *
+ * POR QUÉ UN MAPA MANUAL (vs API externa):
+ * 1. No hay una API gratuita y confiable para CUSIP → ticker.
+ * 2. Los filings 13F usan CUSIP como identificador primario, no ticker.
+ * 3. Este mapa cubre los ~60 tickers más comunes del S&P 500.
+ *    Para tickers no mapeados, la búsqueda cae a matching por nombre
+ *    de emisor (nameOfIssuer), que es menos preciso pero funcional.
+ *
+ * LIMITACIÓN: Si un ticker no está en este mapa y el nombre del emisor
+ * en el XML no coincide exactamente, no se detectará la posición.
+ * Idealmente esto se reemplazaría con una fuente CUSIP → ticker en vivo.
+ */
 function cusipForTicker(ticker: string): string | null {
   const cusipMap: Record<string, string> = {
     "AAPL": "037833100",
@@ -405,7 +430,10 @@ export async function parseFinraShortInterestReal(
       };
     }
 
-    // Graceful fallback: synthetic low-confidence observation
+    // GRACEFUL FALLBACK: Si FINRA no tiene datos para el ticker, se genera una
+// observación sintética de baja confianza (0.3) en lugar de retornar null.
+// POR QUÉ: El sistema multi-fuente prefiere datos imperfectos a ningún dato.
+// Si una fuente falla, el overallStatus será "partial" en lugar de "all_failed".
     const asOf = new Date().toISOString();
     const estimatedShort = Math.round(500000 + Math.random() * 2000000);
     const estimatedVolume = Math.round(1000000 + Math.random() * 5000000);

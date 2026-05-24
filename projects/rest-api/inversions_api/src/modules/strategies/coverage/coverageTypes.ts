@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * coverageTypes.ts
+ * ============================================================================
+ *
+ * FIC: T113/T120: Coverage types — Zod schemas and TypeScript types for coverage strategies, simulation, risk, report, and comparison results.
+ */
+
 import {
   createCoverageStrategyContract,
   isCoverageStrategyContract,

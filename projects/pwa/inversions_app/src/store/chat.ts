@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * chat.ts
+ * ============================================================================
+ *
+ * FIC: Zustand store for AI chat — messages[], status (idle/processing/success/error), sendMessage with polling.
+ */
+
 import { useSyncExternalStore } from "react";
 
 export interface ChatMessage {

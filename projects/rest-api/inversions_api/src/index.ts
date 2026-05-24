@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * index.ts
+ * ============================================================================
+ *
+ * FIC: Entry point — Express app with JSON/CORS/auth middleware, institutional/coverage/AI routers, FINRA cache preload.
+ */
+
 import "dotenv/config";
 import express from "express";
 import { initializeEnvironment } from "./config/environment.js";

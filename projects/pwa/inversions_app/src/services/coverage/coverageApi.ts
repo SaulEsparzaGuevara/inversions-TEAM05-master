@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * coverageApi.ts
+ * ============================================================================
+ *
+ * FIC: Coverage API service — analyzeCoverage POST /api/coverage/analyze.
+ */
+
 import { getAuthHeaders } from "../signals/signalApi";
 
 // ── Payload types (match backend response shapes) ─────────

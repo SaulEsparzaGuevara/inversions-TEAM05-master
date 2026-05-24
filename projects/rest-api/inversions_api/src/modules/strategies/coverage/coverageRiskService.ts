@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * coverageRiskService.ts
+ * ============================================================================
+ *
+ * FIC: T118: Coverage Risk Service — evaluates stop-loss, margin stress, generates recommendations and notifications.
+ */
+
 import { createCoverageStrategyContract, type CoverageStrategyContract } from "./coverageStrategyContract.js";
 import {
   createCoverageRiskServiceResult,

@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * RegulatoryPositionsPage.tsx
+ * ============================================================================
+ *
+ * FIC: Regulatory positions page — 13F table, institutional flow cards, holdings %, source reports with cache indicator.
+ */
+
 import React, { useCallback, useEffect, useState } from "react";
 import {
   getRegulatoryPositions,

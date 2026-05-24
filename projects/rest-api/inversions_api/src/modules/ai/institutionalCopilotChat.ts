@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * institutionalCopilotChat.ts
+ * ============================================================================
+ *
+ * FIC: T121: Institutional Copilot Chat — Gemini 2.5 Flash integration with contextual system prompt, async polling, and graceful degradation.
+ */
+
 import crypto from "node:crypto";
 import type { CoverageStrategyResult } from "../strategies/coverage/coverageTypes.js";
 import type { InstitutionalZone, InstitutionalZonesResult } from "../institutional/institutionalZonesEngine.js";
@@ -96,12 +104,27 @@ interface GeminiParsedPayload {
 }
 
 export class InstitutionalCopilotChat {
+  // Modelo: Gemini 2.5 Flash — balance óptimo entre velocidad y calidad
+  // para análisis financiero en tiempo real.
+  // POR QUÉ FLASH vs PRO: Flash es significativamente más rápido y económico,
+  // suficiente para análisis de cobertura institucional donde la latencia
+  // importa (polling cada 2s).
   private readonly modelVersion = "gemini/gemini-2.5-flash";
   private readonly endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+  // Timeout de 30s para la request a Gemini.
   private readonly timeoutMs = 30_000;
+
+  // Ventana de decisión inicial: 5s. Si Gemini responde antes, se devuelve
+  // respuesta directa (sin polling). Si no, se devuelve 202 Accepted y
+  // el frontend hace polling cada 2s.
+  // POR QUÉ 5s: Es un balance entre UX (respuesta rápida) y realismo
+  // (Gemini puede tardar 3-10s en generar contenido complejo).
   private readonly initialDecisionWindowMs = 5_000;
   private readonly pollingIntervalMs = 2_000;
   private readonly maxPollingAttempts = 15;
+  // TTL del job: 30s — si el usuario no completa el polling en 30s,
+  // el job expira y se devuelve "AI unavailable".
   private readonly jobTtlMs = 30_000;
   private readonly jobs = new Map<string, InstitutionalCopilotJob>();
 
@@ -109,6 +132,23 @@ export class InstitutionalCopilotChat {
     return this.submit(context);
   }
 
+  /**
+   * Envía una consulta al copilot y decide entre respuesta directa o polling.
+   *
+   * ESTRATEGIA DE POLLING (Promise.race):
+   * 1. Se inicia la ejecución de Gemini inmediatamente.
+   * 2. Se espera hasta initialDecisionWindowMs (5s).
+   * 3. Si Gemini responde antes de 5s → se devuelve respuesta directa.
+   * 4. Si Gemini tarda más → se devuelve 202 Accepted con pollingUrl.
+   * 5. El frontend hace GET a /api/ai/institutional-chat/poll/:id cada 2s.
+   *
+   * POR QUÉ ESTE DISEÑO (vs espera síncrona):
+   * - Las APIs de Gemini pueden tardar 3-15s en generar respuestas complejas.
+   * - Una espera síncrona de >10s causa timeouts en proxies/load balancers.
+   * - El polling permite mejor UX (spinner + resultado cuando esté listo).
+   * - Si Gemini falla (timeout, API key inválida), se degrada gracefulmente
+   *   con ai_unavailable=true.
+   */
   async submit(context: InstitutionalCopilotContext): Promise<InstitutionalCopilotSubmissionResponse> {
     this.assertAllowedRole(context.userRole);
 
@@ -126,6 +166,7 @@ export class InstitutionalCopilotChat {
 
     this.jobs.set(responseId, job);
 
+    // Inicia la ejecución de Gemini en background (no await).
     const execution = this.runGeminiWorkflow(job)
       .then((result) => {
         job.status = "completed";
@@ -133,11 +174,14 @@ export class InstitutionalCopilotChat {
         return result;
       })
       .catch((error) => {
+        // DEGRADACIÓN GRACEFUL: Si Gemini falla, se genera respuesta
+        // con ai_unavailable=true en lugar de lanzar error HTTP 500.
         job.status = "completed";
         job.result = this.buildUnavailableResponse(context, evidence, responseId, error);
         return job.result;
       });
 
+    // Race entre ejecución de Gemini y ventana de decisión.
     const decision = await Promise.race([
       execution.then((result) => ({ kind: "completed" as const, result })),
       this.delay(this.initialDecisionWindowMs).then(() => ({ kind: "pending" as const }))
@@ -147,6 +191,7 @@ export class InstitutionalCopilotChat {
       return decision.result;
     }
 
+    // Respuesta 202 Accepted — el frontend debe hacer polling.
     return {
       status: "pending",
       contextId: context.contextId,

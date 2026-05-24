@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * reconstruct_explanation.ts
+ * ============================================================================
+ *
+ * FIC: T205: Reconstruct Explanation — audit tool generating detailed textual explanations of coverage strategy results.
+ */
+
 import { writeFileSync } from 'fs';
 import { createHash } from 'crypto';
 

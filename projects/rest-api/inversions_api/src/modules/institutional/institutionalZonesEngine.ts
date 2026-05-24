@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * institutionalZonesEngine.ts
+ * ============================================================================
+ *
+ * FIC: T108: Institutional Zones Engine — detects support/resistance zones from synthetic sinusoidal candles with volume-weighted clustering and multi-source confidence scoring.
+ */
+
 import {
   createInstitutionalAnalysisContract,
   isFiniteNumber,

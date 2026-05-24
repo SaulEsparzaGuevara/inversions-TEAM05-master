@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * staleInput.ts
+ * ============================================================================
+ *
+ * FIC: T208: Stale Input Detection — checks if data timestamp exceeds threshold (default 1 day), triggers onStale callback.
+ */
+
 export type StaleInputOptions = {
   thresholdMs?: number;
   onStale?: (meta: { ageMs: number }) => void;

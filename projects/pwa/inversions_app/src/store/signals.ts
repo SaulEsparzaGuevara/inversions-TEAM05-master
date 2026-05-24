@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * signals.ts
+ * ============================================================================
+ *
+ * FIC: Zustand store for trading signals — signals[], fetchSignals() placeholder.
+ */
+
 // FIC: Lightweight global store for dashboard signal selection and runtime modes.
 // FIC: Store global ligero para seleccion de senales y modos runtime del dashboard.
 

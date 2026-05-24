@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * AIChatPage.tsx
+ * ============================================================================
+ *
+ * FIC: AI chat page — message history bubbles, context inputs (ticker/price), polling states, degradation banner.
+ */
+
 import React, { useCallback, useRef, useState } from "react";
 import { useChatStore } from "../../store/chat";
 import {

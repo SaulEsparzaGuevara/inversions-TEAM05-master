@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * institutionalDataService.ts
+ * ============================================================================
+ *
+ * FIC: T107: Institutional Data Service — orchestrates 4 real sources (SEC, FINRA, Yahoo Options, Yahoo Inst) with caching, rate limiting, parallel resolution, and graceful degradation (overallStatus).
+ */
+
 import {
   createInstitutionalAnalysisContract,
   isFiniteNumber,
@@ -828,6 +836,20 @@ export class InstitutionalDataService {
     );
   }
 
+  /**
+   * Calcula el nivel de confianza de una observación según cuántos campos
+   * numéricos significativos tenga (ownership, volume, inflows, outflows, count).
+   *
+   * POR QUÉ 5 SEÑALES: Cada fuente puede reportar un subconjunto diferente de
+   * métricas. Por ejemplo, FINRA solo da short interest (no ownership),
+   * mientras que Yahoo Options da volume + OI (no ownership). Este scoring
+   * permite que fuentes con más métricas tengan más peso en el merge final
+   * (mergeObservations ordena por confidence descendente).
+   *
+   * POR QUÉ MÁXIMO 0.95: Nunca se asigna 1.0 porque ninguna fuente externa
+   * es 100% confiable — siempre hay riesgo de datos stale, rate limiting,
+   * o errores de parseo.
+   */
   private computeConfidence(partial: {
     fundsOwnershipPct?: number;
     volume?: number;
@@ -852,6 +874,14 @@ export class InstitutionalDataService {
     return 0.55;
   }
 
+  /**
+   * Normaliza un valor de porcentaje.
+   *
+   * POR QUÉ value <= 1 → * 100: Algunas APIs devuelven ownership como
+   * decimal (0.35 = 35%) y otras como porcentaje directo (35). Esta función
+   * detecta automáticamente el formato: si es <= 1, asume decimal y
+   * multiplica por 100. Si es > 1, asume que ya está en porcentaje.
+   */
   private normalizePercentage(value: number | undefined): number | undefined {
     if (!isFiniteNumber(value)) {
       return undefined;
@@ -964,6 +994,15 @@ export class InstitutionalDataService {
     return undefined;
   }
 
+  /**
+   * Extrae el primer valor definido recorriendo múltiples rutas alternativas.
+   *
+   * POR QUÉ MÚLTIPLES PATHS: Diferentes APIs y parsers usan nombres de campo
+   * distintos para el mismo concepto (e.g., "holdingsCount" vs "positions.length"
+   * vs "holdings/length"). En lugar de forzar un formato único, este método
+   * prueba varias rutas y toma la primera que encuentre, haciendo el servicio
+   * tolerante a cambios en los formatos de las APIs externas.
+   */
   private extractValue(payload: unknown, paths: string[][]): unknown {
     for (const path of paths) {
       const value = this.readPath(payload, path);
@@ -1005,6 +1044,24 @@ export class InstitutionalDataService {
     return current;
   }
 
+  /**
+   * Fusiona múltiples observaciones de fuentes en un solo contrato canónico.
+   *
+   * ESTRATEGIA DE MERGE:
+   * - fundsOwnershipPct → PROMEDIO: porque cada fuente estima el mismo
+   *   concepto (porcentaje de tenencia institucional) desde ángulos distintos.
+   *   Promediar reduce el sesgo de una fuente individual.
+   * - volume → MÁXIMO: porque cada fuente mide un tipo de volumen diferente
+   *   (SEC: shares reportados, FINRA: short volume, Yahoo: opciones).
+   *   Tomar el máximo asegura que no se subestime la actividad total.
+   * - flows → SUMA: porque inflows de SEC + inflows de Yahoo son
+   *   flujos independientes que deben acumularse.
+   * - openPositions.count → MÁXIMO: similar a volume, cada fuente cuenta
+   *   posiciones distintas.
+   * - Campos categóricos (horizon, strike, instrument) → FIRST DEFINED:
+   *   se toma el primer valor definido ordenando por confidence,
+   *   porque todas las fuentes deberían coincidir en estos metadatos.
+   */
   private mergeObservations(
     request: InstitutionalAnalysisContract,
     observations: InstitutionalSourceObservation[]

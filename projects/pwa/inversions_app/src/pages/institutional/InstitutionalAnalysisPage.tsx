@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * InstitutionalAnalysisPage.tsx
+ * ============================================================================
+ *
+ * FIC: Institutional analysis page — S/R zones table, trend card, metrics, catalyst windows, source reports.
+ */
+
 import React, { useCallback, useEffect, useState } from "react";
 import {
   getInstitutionalAnalysis,

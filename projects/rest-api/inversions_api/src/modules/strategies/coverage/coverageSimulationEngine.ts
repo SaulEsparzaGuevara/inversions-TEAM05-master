@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * coverageSimulationEngine.ts
+ * ============================================================================
+ *
+ * FIC: T117: Coverage Simulation Engine — Monte Carlo (10K iterations) and backtest with deterministic scenarios, VaR, Expected Shortfall.
+ */
+
 import { CollarEngine } from "./collarEngine.js";
 import { CoveredStraddleEngine } from "./coveredStraddleEngine.js";
 import { ProtectivePutEngine } from "./protectivePutEngine.js";

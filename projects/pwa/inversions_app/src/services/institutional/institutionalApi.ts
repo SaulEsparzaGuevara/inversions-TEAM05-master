@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * institutionalApi.ts
+ * ============================================================================
+ *
+ * FIC: Institutional API service — getInstitutionalAnalysis and getRegulatoryPositions GET functions.
+ */
+
 import { getAuthHeaders } from "../signals/signalApi";
 
 export interface InstitutionalAnalysisRequest {

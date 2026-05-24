@@ -42,7 +42,11 @@ interface CrumbSession {
   expiresAt: number;
 }
 
-// Separate crumb cache for institutional (in case options parser cleared it)
+// Cache de crumb INDEPENDIENTE del parser de options.
+// POR QUÉ SEPARADO: Ambos parsers (options e institutional) usan crumb auth,
+// pero tener caches separados evita que un fallo en un parser invalide la
+// sesión del otro. Además, cada uno puede tener su propio ciclo de refresh
+// sin interferencias.
 let instCrumbSession: CrumbSession | null = null;
 let instCrumbSessionPromise: Promise<CrumbSession> | null = null;
 

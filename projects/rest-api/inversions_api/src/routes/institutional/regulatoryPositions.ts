@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * regulatoryPositions.ts
+ * ============================================================================
+ *
+ * FIC: T112: Regulatory Positions Route — GET /api/institutional/positions returning 13F data, institutional flows, holdings and sourceReports.
+ */
+
 import { Router } from "express";
 import { authContextMiddleware } from "../../middleware/authContext.js";
 import {

@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * ChatHistory.tsx
+ * ============================================================================
+ *
+ * FIC: Chat history component — user/assistant message bubbles with roles and timestamps.
+ */
+
 import React from "react";
 import { useChatStore, type ChatMessage } from "../../store/chat";
 

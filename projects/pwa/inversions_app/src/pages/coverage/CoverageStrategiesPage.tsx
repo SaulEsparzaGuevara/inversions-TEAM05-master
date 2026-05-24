@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * CoverageStrategiesPage.tsx
+ * ============================================================================
+ *
+ * FIC: Coverage simulation page — 4 strategy cards with Recharts payoff chart, metrics, alerts, ranked recommendations.
+ */
+
 import React, { useCallback, useState } from "react";
 import {
   postCoverageAnalyze,

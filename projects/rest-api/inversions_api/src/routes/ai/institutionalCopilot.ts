@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * institutionalCopilot.ts
+ * ============================================================================
+ *
+ * FIC: T121b: Institutional Copilot Route — POST /api/ai/institutional-chat and GET /poll/:id with Zod validation and async polling.
+ */
+
 import { Router, type Request, type Response } from "express";
 import { authContextMiddleware } from "../../middleware/authContext.js";
 import InstitutionalCopilotChat, {

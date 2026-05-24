@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * purgeEvidenceJob.ts
+ * ============================================================================
+ *
+ * FIC: T202: Purge Evidence Job — scheduled task to purge analysis evidence older than 90 days.
+ */
+
 import { supabaseClient } from "../database/supabase/client.js";
 
 export interface PurgeEvidenceJobResult {

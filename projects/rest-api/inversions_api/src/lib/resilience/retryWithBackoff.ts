@@ -1,3 +1,11 @@
+/**
+ * ============================================================================
+ * retryWithBackoff.ts
+ * ============================================================================
+ *
+ * FIC: T208: Retry with Backoff — exponential backoff retry utility with jitter (max 5 attempts, 10s cap).
+ */
+
 export type RetryOptions = {
   maxAttempts?: number;
   baseMs?: number;
