@@ -489,10 +489,14 @@ export class ExpirationAnalysisEngine {
 
   /**
    * Analyse expiration dynamics for an institutional request.
+   *
+   * @param preResolvedResult - Optional pre-resolved data from InstitutionalDataService.
+   *   When provided, the engine skips calling resolve() again, saving one full
+   *   multi-source fetch cycle.
    */
-  async analyze(request: ExpirationAnalysisRequest): Promise<ExpirationAnalysisResult> {
+  async analyze(request: ExpirationAnalysisRequest, preResolvedResult?: InstitutionalDataServiceResult): Promise<ExpirationAnalysisResult> {
     const analysis = createInstitutionalAnalysisContract(request.analysis);
-    const institutionalResult = await this.institutionalDataService.resolve(analysis);
+    const institutionalResult = preResolvedResult ?? await this.institutionalDataService.resolve(analysis);
     const referenceDate = request.referenceDate ?? new Date();
     const windowDays = request.analysisWindowDays ?? this.defaultWindowDays;
 

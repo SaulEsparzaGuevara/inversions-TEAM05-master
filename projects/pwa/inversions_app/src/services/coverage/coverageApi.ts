@@ -7,6 +7,34 @@
  */
 
 import { getAuthHeaders } from "../signals/signalApi";
+import { buildCacheKey, getCached, setCache } from "../apiCache.js";
+
+// ── Retry helper ──────────────────────────────────────────
+
+const MAX_RETRIES = 2;
+const BASE_DELAY_MS = 1_000;
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  retries = MAX_RETRIES
+): Promise<Response> {
+  let lastResponse: Response | undefined;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    lastResponse = await fetch(url, init);
+    if (lastResponse.ok) return lastResponse;
+    // Only retry on 5xx, 429 (rate-limit), or network errors
+    if (lastResponse.status < 500 && lastResponse.status !== 429) {
+      return lastResponse;
+    }
+    if (attempt < retries) {
+      const delay = BASE_DELAY_MS * 2 ** attempt;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  // Return last attempt's response
+  return lastResponse!;
+}
 
 // ── Payload types (match backend response shapes) ─────────
 
@@ -149,58 +177,82 @@ export interface CoverageSimulateRequest {
 const API_BASE = "/api/coverage";
 
 export async function postCoverageAnalyze(
-  payload: CoverageAnalyzeRequest
+  payload: CoverageAnalyzeRequest,
+  signal?: AbortSignal
 ): Promise<CoverageAnalysisResponse> {
-  const response = await fetch(`${API_BASE}/analyze`, {
+  const cacheKey = buildCacheKey(`${API_BASE}/analyze`, payload);
+  const cached = getCached<CoverageAnalysisResponse>(cacheKey);
+  if (cached) return cached;
+
+  const response = await fetchWithRetry(`${API_BASE}/analyze`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...getAuthHeaders()
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal
   });
 
   if (!response.ok) {
     throw new Error(`Error al analizar coberturas: ${response.status}`);
   }
 
-  return (await response.json()) as CoverageAnalysisResponse;
+  const data = (await response.json()) as CoverageAnalysisResponse;
+  setCache(cacheKey, data);
+  return data;
 }
 
 export async function postCoverageCompare(
-  payload: CoverageCompareRequest
+  payload: CoverageCompareRequest,
+  signal?: AbortSignal
 ): Promise<CoverageComparisonResponse> {
-  const response = await fetch(`${API_BASE}/compare`, {
+  const cacheKey = buildCacheKey(`${API_BASE}/compare`, payload);
+  const cached = getCached<CoverageComparisonResponse>(cacheKey);
+  if (cached) return cached;
+
+  const response = await fetchWithRetry(`${API_BASE}/compare`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...getAuthHeaders()
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal
   });
 
   if (!response.ok) {
     throw new Error(`Error al comparar coberturas: ${response.status}`);
   }
 
-  return (await response.json()) as CoverageComparisonResponse;
+  const data = (await response.json()) as CoverageComparisonResponse;
+  setCache(cacheKey, data);
+  return data;
 }
 
 export async function postCoverageSimulate(
-  payload: CoverageSimulateRequest
+  payload: CoverageSimulateRequest,
+  signal?: AbortSignal
 ): Promise<CoverageSimulationResponse> {
-  const response = await fetch(`${API_BASE}/simulate`, {
+  const cacheKey = buildCacheKey(`${API_BASE}/simulate`, payload);
+  const cached = getCached<CoverageSimulationResponse>(cacheKey);
+  if (cached) return cached;
+
+  const response = await fetchWithRetry(`${API_BASE}/simulate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...getAuthHeaders()
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal
   });
 
   if (!response.ok) {
     throw new Error(`Error al simular cobertura: ${response.status}`);
   }
 
-  return (await response.json()) as CoverageSimulationResponse;
+  const data = (await response.json()) as CoverageSimulationResponse;
+  setCache(cacheKey, data);
+  return data;
 }

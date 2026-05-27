@@ -6,6 +6,13 @@ Feature para TEAM-05 (TurboPapus): análisis institucional y estrategias de cobe
 
 ## Clarifications
 
+### Session 2026-05-25
+
+- Q: ¿Qué escala debe usar el campo `confidence` en todas las salidas del sistema (análisis institucional, señales de confluencia, coberturas)? → A: Decimal 0-1. `confidence` se expresa siempre en rango [0.00, 1.00]. El frontend debe multiplicar por 100 para mostrar porcentaje. Ninguna fuente/servicio debe retornar valores en 0-100.
+- Q: ¿Qué códigos de error específicos debe reportar cada fuente upstream cuando falla? → A: Códigos estandarizados (5 valores): `HTTP_ERROR` (error HTTP de la fuente), `TIMEOUT` (timeout de red/aborto), `RATE_LIMITED` (límite de tasa excedido), `EMPTY_RESPONSE` (parser retornó null sin datos utilizables), `PARSE_ERROR` (error en parsing del payload). Cada `sourceReport.error.code` debe contener uno de estos valores.
+- Q: ¿Qué escenarios de prueba con valores esperados debe incluir la validación de los motores de cobertura? → A: 3 escenarios fijos con aserciones numéricas: (1) Protective Put precio=$450.50, shares=100, strike=$440 → pérdida máxima ~$1,050. (2) Collar Put con mismo precio/strike → rango acotado superior e inferior. (3) Covered Straddle → ingresos por primas vs riesgo ilimitado. Los tests deben fallar si el payoff de opciones está mal escalado (ej. 100× menor).
+- Q: ¿Qué requisitos de renderizado aplican a los componentes frontend para estados de carga, error y datos vacíos? → A: Cada componente debe implementar 3 estados: (1) loading skeleton mientras la API responde, (2) error con mensaje específico del problema, (3) vacío con texto explicativo ("No se encontraron datos para X"). Los accesos a propiedades anidadas deben usar optional chaining (`?.`) para evitar crashes si la respuesta es parcial.
+
 ### Session 2026-05-22
 
 - Q: ¿Qué comportamiento debe tener el sistema cuando las fuentes de datos upstream (SEC EDGAR, FINRA, Yahoo Finance) están caídas o retornan error? → A: El sistema retorna análisis parcial con las fuentes disponibles. Cada fuente inaccesible se reporta individualmente en `sourceReports[].status = "error"` con detalle del error, sin bloquear la respuesta completa. Si todas las fuentes fallan, retorna HTTP 503 con `{"error":"all_sources_unavailable","sourceReports":[...]}`.
@@ -42,14 +49,16 @@ Entregar un componente modular que produzca análisis institucional accionable y
 - La IA no ejecuta operaciones y no sustituye el juicio humano (RNF-001).
 - Reproducibilidad y auditabilidad de cálculos (RNF-002).
 - Estrategias desacopladas de broker y frontend (RNF-003).
+- Los componentes frontend deben implementar 3 estados de renderizado: loading skeleton mientras la API responde, error con mensaje específico del problema, y vacío con texto explicativo. Todo acceso a propiedades anidadas debe usar optional chaining (`?.`) para tolerar respuestas parciales.
 - La salida debe ser clara, defendible y orientada a control de riesgo (RNF-004).
+- Escala canónica de `confidence`: todos los campos `confidence` en las salidas del sistema (análisis institucional, señales de confluencia, coberturas, source reports) usan rango decimal [0.00, 1.00]. Ninguna fuente o servicio debe retornar valores en escala 0-100.
 - No invadir otros dominios de análisis (técnico, noticias, ejecución) (RNF-005).
 - Cobertura de tests mínima 80% en rutas críticas (RNF-006).
 - Trazabilidad operacional de IA por respuesta: registrar `context_id`, estrategia, evidencia usada, timestamp, versión de modelo y hash de salida para auditoría y reproducción.
 - Rendimiento: la respuesta completa (cálculo + explicación IA) debe cumplir p95 <= 5s; si excede, el sistema debe responder en modo asíncrono con polling cada 2s, timeout total de 30s y máximo 15 intentos.
 - Seguridad de acceso: solo roles `analyst` y `risk_manager` pueden consultar o solicitar explicaciones; este módulo no expone operaciones de ejecución para ningún rol.
 - Retención de auditoría: conservar trazas y evidencias operativas durante 365 días para revisión, cumplimiento y análisis post-incidente.
-- Degradación por fuentes externas: si una fuente upstream (SEC EDGAR, FINRA, Yahoo Finance) falla, el sistema retorna análisis parcial con las fuentes restantes, reportando cada fuente fallida individualmente con `sourceReports[].status = "error"`. Si todas las fuentes fallan, retorna HTTP 503.
+- Degradación por fuentes externas: si una fuente upstream (SEC EDGAR, FINRA, Yahoo Finance) falla, el sistema retorna análisis parcial con las fuentes restantes, reportando cada fuente fallida individualmente con `sourceReports[].status = "error"` y un `error.code` estandarizado: `HTTP_ERROR`, `TIMEOUT`, `RATE_LIMITED`, `EMPTY_RESPONSE`, o `PARSE_ERROR`. Si todas las fuentes fallan, retorna HTTP 503.
 
 ## Restricciones
 
@@ -67,6 +76,7 @@ Entregar un componente modular que produzca análisis institucional accionable y
 ## Criterios de Aceptación
 
 - Los cálculos son reproducibles con datasets de ejemplo y pruebas automatizadas.
+- Los motores de cobertura incluyen 3 escenarios fijos con aserciones numéricas (Protective Put, Collar Put, Covered Straddle) que verifican que el payoff de opciones está correctamente escalado contra el número de acciones.
 - Las salidas cumplen el contrato JSON y pasan validadores de esquema.
 - El Chat IA presenta explicaciones consistentes y trazables a la evidencia usada.
 - No existen paths que permitan auto-trading; todas las recomendaciones requieren validación humana.
@@ -78,6 +88,7 @@ Entregar un componente modular que produzca análisis institucional accionable y
 - En pruebas de autorización, solo `analyst` y `risk_manager` acceden a consulta/explicación; cualquier intento de ejecución de órdenes desde este módulo debe responder `forbidden`.
 - Ante falla del proveedor IA, el endpoint responde con cálculo/estrategia estructurada y flag `ai_unavailable`, sin bloquear la salida principal de cobertura.
 - Las trazas y evidencias requeridas para auditoría permanecen disponibles durante 365 días y son recuperables para inspección.
+- Todos los campos `confidence` en respuestas API cumplen la escala canónica [0.00, 1.00]; ningún endpoint retorna confidence en escala 0-100.
 
 ## Dependencias
 

@@ -395,10 +395,14 @@ export class InstitutionalTrendEngine {
 
   /**
    * Analyse an institutional request and return trend data.
+   *
+   * @param preResolvedResult - Optional pre-resolved data from InstitutionalDataService.
+   *   When provided, the engine skips calling resolve() again, saving one full
+   *   multi-source fetch cycle.
    */
-  async analyze(request: InstitutionalTrendRequest): Promise<InstitutionalTrendResult> {
+  async analyze(request: InstitutionalTrendRequest, preResolvedResult?: InstitutionalDataServiceResult): Promise<InstitutionalTrendResult> {
     const analysis = createInstitutionalAnalysisContract(request.analysis);
-    const institutionalResult = await this.institutionalDataService.resolve(analysis);
+    const institutionalResult = preResolvedResult ?? await this.institutionalDataService.resolve(analysis);
     const candles = this.normalizeCandles(
       request.candles ?? this.buildFallbackCandles(analysis, institutionalResult)
     );

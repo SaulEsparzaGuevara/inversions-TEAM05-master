@@ -15,8 +15,9 @@ Construir la web PWA que consuma los 4 endpoints REST de análisis institucional
 **Testing**: Vitest + React Testing Library (80% min coverage)  
 **Target Platform**: Navegadores Desktop (Responsive) y PWA  
 **Project Type**: Web Application / PWA frontend  
-**Performance Goals**: Tiempo de carga inicial < 2s en entorno dev  
-**Constraints**: fetch nativo (sin axios), degradación IA limpia, polling cada 2s máx 30s (15 intentos)  
+**Performance Goals**: Tiempo de carga inicial < 2s en entorno dev; navegación entre páginas del mismo ticker reusa caché en memoria.  
+**Constraints**: fetch nativo (sin axios), degradación IA limpia, polling cada 2s máx 30s (15 intentos).  
+**Client-Side Cache**: In-memory cache with TTL (5 min) vía `apiCache.ts`; retry automático en 5xx/429 con backoff exponencial; AbortController para cancelar requests al cambiar de ticker o desmontar componente.  
 **Scale/Scope**: 4 páginas nuevas (`/institutional/analysis`, `/institutional/positions`, `/coverage/strategies`, `/ai/chat`), 3 servicios API frontend, wrapper de layout
 
 ## Constitution Check
@@ -105,6 +106,24 @@ Además del frontend, esta feature integra **fuentes de datos reales** para los 
 
 > Unusual Whales y Finviz Institutional eliminados — reemplazados por Yahoo Finance (completado).
 
+### Frontend API Performance Optimization (Phase 10)
+
+**Objetivo**: Reducir latencia percibida, eliminar llamadas duplicadas y prevenir race conditions en páginas que consumen APIs lentas (coverage, institutional).
+
+**In-Memory Cache Layer**: Nuevo módulo `apiCache.ts` provee cache singleton a nivel de módulo con TTL configurable (default 5 min). API: `getCached<T>()`, `setCache()`, `clearCache()`, `invalidateCache()`. Key compuesto de URL + JSON.stringify(body). Sin dependencia React.
+
+**Cache-before-fetch**: `coverageApi.ts` y `institutionalApi.ts` verifican el cache antes de cada fetch, almacenando la respuesta exitosa. Navegar entre páginas del mismo ticker no dispara requests repetidas (~90% de reducción).
+
+**Retry con Backoff**: Helper `fetchWithRetry()` envuelve `fetch()` nativo con hasta 2 reintentos solo en respuestas 5xx/429, backoff exponencial (1s, 2s). Errores 2xx y 4xx no retry.
+
+**AbortSignal en todas las funciones API**: `coverageApi.ts` e `institutionalApi.ts` aceptan `signal?: AbortSignal`. Las 3 páginas (`InstitutionalAnalysisPage`, `RegulatoryPositionsPage`, `CoverageStrategiesPage`) usan `useRef<AbortController>` que aborta la request anterior al cambiar de ticker y limpia en unmount. Elimina race conditions.
+
+**Auth Headers Memoizados**: `getAuthHeaders()` en `signalApi.ts` cachea el token en memoria en vez de leer `localStorage` en cada llamada. `invalidateAuthCache()` para reset en logout.
+
+**Refreshing Overlay**: Al re-fetch con datos existentes, se muestra una barra animada delgada en vez de ocultar resultados. Estado `isRefreshing = loading && data !== null`.
+
+**Test Isolation**: `clearCache()` en `beforeEach` de `coverageApi.test.ts` previene contaminación entre tests por el cache singleton.
+
 ## Project Structure
 
 ### Documentation (this feature)
@@ -142,10 +161,13 @@ projects/pwa/inversions_app/
 │   │   └── ai/
 │   │       └── AIChatPage.tsx
 │   ├── services/
+│   │   ├── apiCache.ts                    # In-memory cache with TTL
+│   │   ├── signals/
+│   │   │   └── signalApi.ts               # (getAuthHeaders memoized)
 │   │   ├── institutional/
-│   │   │   └── institutionalApi.ts
+│   │   │   └── institutionalApi.ts        # Cache + retry + AbortSignal
 │   │   ├── coverage/
-│   │   │   └── coverageApi.ts
+│   │   │   └── coverageApi.ts             # Cache + retry + AbortSignal
 │   │   └── ai/
 │   │       └── aiChatApi.ts
 │   ├── store/

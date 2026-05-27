@@ -35,6 +35,29 @@
 - **SEC parser optimization**: MAX_FILINGS = 5, no artificial delay, parallelized with Promise.all.
 - **No persistence for analysis results**: Every analysis request is computed live from source data. Only audit traces (evidence, explanations) are persisted for 365 days.
 
+### Source Error Code Standardization (Clarified 2026-05-25)
+
+| Código | Significado | Cuándo ocurre |
+|--------|-------------|---------------|
+| `HTTP_ERROR` | Error HTTP de la fuente (status ≠ 2xx) | SEC, FINRA, Yahoo responden con error |
+| `TIMEOUT` | Timeout de red / aborto por tiempo | Fuente no respondió en 12s |
+| `RATE_LIMITED` | Límite de tasa excedido | >10 req/min a SEC, >20 req/min a Yahoo |
+| `EMPTY_RESPONSE` | Parser retornó null sin datos utilizables | SEC no encuentra filings, ticker no en CUSIP map |
+| `PARSE_ERROR` | Error en parsing del payload | XML malformado, JSON inesperado |
+
+### Confidence Scale (Clarified 2026-05-25)
+
+- `confidence` se expresa en rango decimal [0.00, 1.00] en todos los endpoints.
+- El frontend multiplica por 100 para display porcentual.
+- Ninguna fuente o servicio retorna valores en escala 0-100.
+- Verificado contra: `computeConfidence()` retorna 0.55–0.95, contrato `observation.confidence` validado como `[0, 1]`.
+
+### Frontend Rendering Requirements (Clarified 2026-05-25)
+
+- Cada componente implementa 3 estados: loading skeleton, error con mensaje específico, vacío con texto explicativo.
+- Todo acceso a propiedades anidadas debe usar optional chaining (`?.`).
+- Afecta: MainDashboard, SignalOverlay, ConfluenceSignalsTable, SuperChart, ExecutionPanel, RegulatoryPositionsPage, InstitutionalAnalysisPage.
+
 ### Coverage Strategy Parameters (MVP Defaults)
 
 | Parameter | Default | Range |

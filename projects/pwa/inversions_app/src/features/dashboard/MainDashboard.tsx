@@ -14,7 +14,7 @@ import { TimeControls } from "./TimeControls";
 import { IndicatorsMenu } from "./IndicatorsMenu";
 import { RuntimeModeSwitches } from "./RuntimeModeSwitches";
 import { ConfluenceSignalsTable } from "./ConfluenceSignalsTable";
-import { useSignalStore } from "../../store/signals";
+import { useSignalStore, type SelectedSignal } from "../../store/signals";
 
 const initialCores: CoreDefinition[] = [
   { id: "technical", label: "Technical", description: "Momentum y estructura", enabled: true },
@@ -40,11 +40,10 @@ export function MainDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<DashboardOrchestratorResponse | null>(null);
-  const [selectedSignal, setSelectedSignal] = useState<DashboardSignalCard | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const { selectedInstrument } = useSignalStore();
+  const { selectedInstrument, selectedSignal, setSelectedSignal } = useSignalStore();
 
-  const selectedSymbol = selectedInstrument?.symbol ?? payload?.cards[0]?.instrument ?? "SPY";
+  const selectedSymbol = selectedInstrument?.symbol ?? payload?.cards?.[0]?.instrument ?? "SPY";
 
   const activeCoreCount = useMemo(() => cores.filter((core) => core.enabled).length, [cores]);
 
@@ -59,7 +58,7 @@ export function MainDashboard() {
       });
 
       setPayload(response);
-      setSelectedSignal(response.cards[0] ?? null);
+      setSelectedSignal(response.cards?.[0] ?? null);
       setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cargar dashboard");

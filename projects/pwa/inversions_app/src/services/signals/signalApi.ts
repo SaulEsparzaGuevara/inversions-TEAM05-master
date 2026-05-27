@@ -98,18 +98,39 @@ interface ApiErrorPayload {
 
 const API_BASE = "/api/signals";
 
-export function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {};
+let cachedAuthHeaders: Record<string, string> | null = null;
+let cachedAuthToken: string | null = null;
+
+function readAuthToken(): string | null {
   const storageToken =
-    typeof window !== "undefined" ? window.localStorage.getItem("inversions.dev.token") ?? undefined : undefined;
+    typeof window !== "undefined" ? window.localStorage.getItem("inversions.dev.token") : null;
   const envToken = import.meta.env.VITE_DEV_BEARER_TOKEN as string | undefined;
-  const token = storageToken || envToken;
+  return storageToken || envToken || null;
+}
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+/**
+ * Returns auth headers, caching the token in memory to avoid repeated
+ * localStorage reads on every API call. The cache is invalidated whenever
+ * the underlying token source changes.
+ */
+export function getAuthHeaders(): Record<string, string> {
+  const currentToken = readAuthToken();
+  if (currentToken !== cachedAuthToken) {
+    cachedAuthToken = currentToken;
+    cachedAuthHeaders = currentToken
+      ? { Authorization: `Bearer ${currentToken}` }
+      : {};
   }
+  return cachedAuthHeaders!;
+}
 
-  return headers;
+/**
+ * Force re-read the auth token on the next call to getAuthHeaders().
+ * Use this if the token might have changed (e.g., after login/logout).
+ */
+export function invalidateAuthCache(): void {
+  cachedAuthToken = null;
+  cachedAuthHeaders = null;
 }
 
 export async function evaluateSignal(payload: EvaluateSignalRequest): Promise<EvaluateSignalResponse> {

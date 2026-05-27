@@ -36,10 +36,16 @@ export class CoverageReportService {
     this.outputDir = options.outputDir ?? path.join(process.cwd(), "reports", "coverage");
   }
 
-  async generateReport(strategyReq: CoverageStrategyContract, recipients: { email?: string[]; push?: string[] } = {}): Promise<CoverageReportResult> {
+  async generateReport(
+    strategyReq: CoverageStrategyContract,
+    recipients: { email?: string[]; push?: string[] } = {},
+    precomputed?: { simulation?: CoverageSimulationResult; risk?: CoverageRiskServiceResult }
+  ): Promise<CoverageReportResult> {
     const strategy = createCoverageStrategyContract(strategyReq);
-    const baseResult = this.simulationEngine.analyze(strategyReq);
-    const risk = await this.riskService.evaluate(baseResult.baseResult, baseResult, recipients);
+
+    // Use precomputed results when available (avoids duplicate simulation+risk evaluation)
+    const baseResult = precomputed?.simulation ?? this.simulationEngine.analyze(strategyReq);
+    const risk = precomputed?.risk ?? await this.riskService.evaluate(baseResult.baseResult, baseResult, recipients);
 
     const summary = this.buildSummary(baseResult, risk);
     const logs: string[] = [];
@@ -52,10 +58,6 @@ export class CoverageReportService {
     // JSON export
     const jsonFile = `${strategy.strategyId}-report.json`;
     const jsonContent = JSON.stringify({ summary, baseResult, risk }, null, 2);
-    await fs.mkdir(this.outputDir, { recursive: true });
-    await fs.writeFile(path.join(this.outputDir, jsonFile), jsonContent, "utf8");
-    exports.push({ format: "json", fileName: jsonFile, content: jsonContent });
-
     // Markdown summary
     const mdFile = `${strategy.strategyId}-summary.md`;
     const mdLines: string[] = [];
@@ -72,7 +74,14 @@ export class CoverageReportService {
     }
 
     const mdContent = mdLines.join("\n");
-    await fs.writeFile(path.join(this.outputDir, mdFile), mdContent, "utf8");
+
+    // Parallel file I/O: create dir first, then write both files concurrently
+    await fs.mkdir(this.outputDir, { recursive: true });
+    await Promise.all([
+      fs.writeFile(path.join(this.outputDir, jsonFile), jsonContent, "utf8"),
+      fs.writeFile(path.join(this.outputDir, mdFile), mdContent, "utf8")
+    ]);
+    exports.push({ format: "json", fileName: jsonFile, content: jsonContent });
     exports.push({ format: "md", fileName: mdFile, content: mdContent });
 
     const result = createCoverageReportResult({

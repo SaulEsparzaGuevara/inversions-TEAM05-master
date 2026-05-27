@@ -225,10 +225,15 @@ export class InstitutionalZonesEngine {
 
   /**
    * Analyze an institutional request and return support/resistance zones.
+   *
+   * @param preResolvedResult - Optional pre-resolved data from InstitutionalDataService.
+   *   When provided, the engine skips calling resolve() again, saving one full
+   *   multi-source fetch cycle. Use this when calling multiple engines with the
+   *   same analysis contract to avoid N resolve() calls for N engines.
    */
-  async analyze(request: InstitutionalZonesRequest): Promise<InstitutionalZonesResult> {
+  async analyze(request: InstitutionalZonesRequest, preResolvedResult?: InstitutionalDataServiceResult): Promise<InstitutionalZonesResult> {
     const analysis = createInstitutionalAnalysisContract(request.analysis);
-    const institutionalResult = await this.institutionalDataService.resolve(analysis);
+    const institutionalResult = preResolvedResult ?? await this.institutionalDataService.resolve(analysis);
     const candles = this.normalizeCandles(request.candles ?? this.buildFallbackCandles(analysis, institutionalResult));
 
     if (candles.length < this.pivotWindow * 2 + 1) {

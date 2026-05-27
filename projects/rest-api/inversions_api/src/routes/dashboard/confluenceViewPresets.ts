@@ -3,7 +3,7 @@
 
 import { Router, Request, Response } from "express";
 import { authContextMiddleware } from "../../middleware/authContext.js";
-import { createAuthenticatedClient } from "../../database/supabase/client.js";
+import { createAuthenticatedClient, supabaseClient } from "../../database/supabase/client.js";
 
 const router = Router();
 
@@ -312,7 +312,7 @@ router.get(
         return res.status(401).json({ error: "AUTH_CONTEXT_MISSING" });
       }
 
-      const supabase = createAuthenticatedClient(req.authContext.token);
+      const supabase = supabaseClient;
       const { data, error } = await supabase
         .from("confluence_column_configs")
         .select("field_key,label,data_type,visible,order_index,format_rule,color_rule,is_filterable,is_sortable,is_exportable")

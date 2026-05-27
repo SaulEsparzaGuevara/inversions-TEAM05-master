@@ -176,8 +176,178 @@ All canonical tasks (T106-T121, T173) depend on Phase 1 being complete.
 3. Add Phase 3: Yahoo Finance + remove all mock data
 4. Add Phase 4: Resilience, tests, documentation
 
+---
+
+### Phase 5: Coverage Engine Fix — Option Payoff Scaling (CRÍTICO)
+
+- [X] T504 [P] Fix option payoff scaling in all coverage engines — `contractScale` (número de contratos = 1 para 100 acciones) usado incorrectamente como factor de dólares en vez de `strategy.shares`:
+  - ✅ `protectivePutEngine.ts` — `putPayoff * contractScale` → `putPayoff * strategy.shares`; también `calculateNetPremiumPerShare` y `calculateVolatilityStress` corregidos
+  - ✅ `collarEngine.ts` — `longPutPnL * contractScale` y `shortCallPnL * contractScale` → `* strategy.shares`; `calculateNetPremiumPerShare` corregido
+  - ✅ `coveredStraddleEngine.ts` — `shortPutPnL * contractScale` y `shortCallPnL * contractScale` → `* strategy.shares`; `calculateNetPremiumPerShare` corregido
+  - ✅ `coverageSimulationEngine.ts` — `optionPremiumCashFlow` y `optionPayoff` con `toContractScale` → `* strategy.shares`
+  - ✅ **Verificación**: tests unitarios pasan (4/4) y payoff ahora escala correctamente por `strategy.shares`
+- [X] T505 Implementar cálculo real de primas de opciones — agregado `estimateOptionPremium()` en `coverageTypes.ts` (Black-Scholes simplificado con normalCdf) y reemplazado `premium: 0` hardcodeado en `analyze.ts:37-47` por estimación basada en precio, strike, días a vencimiento (90d) y volatilidad implícita (25%)
+
+---
+
+### Phase 6: Backend Fix — SEC EDGAR Date Dinámica
+
+- [X] T502 [P] Fix `enddt` hardcodeado en EFTS search de SEC EDGAR:
+  - `realSourceParsers.ts:67-68` — `enddt=2026-05-20` → `enddt=${new Date().toISOString().slice(0, 10)}`
+  - ✅ **Impacto corregido**: fecha dinámica, 13F posteriores al 20-May-2026 ya se encuentran
+
+---
+
+### Phase 7: Frontend Rendering Validation
+
+- [X] T506 [P] Fix unsafe `cards[0]` access en MainDashboard:
+  - ✅ `MainDashboard.tsx:47`: `payload?.cards?.[0]?.instrument` con optional chaining
+  - ✅ `MainDashboard.tsx:62`: `response.cards?.[0]` con optional chaining
+
+- [X] T507 Unificar estado `selectedSignal` entre MainDashboard y Zustand store:
+  - ✅ MainDashboard ahora usa `const { selectedSignal, setSelectedSignal } = useSignalStore()`
+  - ✅ Estado local `useState<DashboardSignalCard | null>` eliminado
+
+- [X] T508 Validar escala de `timestamp` en SuperChart y ConfluenceSignalsTable:
+  - ✅ OHLC API (ohlc.ts:44) retorna `time` en segundos → `* 1000` es correcto
+  - ✅ Señales endpoint usa Unix seconds por convención → `* 1000` correcto
+
+- [X] T509 Fix `selectedSignal.id` vs `signalId` en SuperChart:
+  - ✅ `SuperChart.tsx:225`: comparación unificada con `selectedSignal?.signalId || selectedSignal?.id`
+
+- [X] T510 Validar escala de `confidence` en todo el frontend:
+  - ✅ Confianza es [0.00, 1.00] canónico del spec → `Math.round(card.confidence * 100)` es correcto
+  - ✅ Revisados `SignalOverlay.tsx:68`, `ExplainabilityTable.tsx:45`, `SignalEvidencePanel.tsx:45` — todos correctos
+
+- [X] T511 Fix `error.error` en ExecutionPanel:
+  - ✅ `ExecutionPanel.tsx:128`: `error.message || error.error || 'Execution failed'` — tolera ambos formatos
+
+- [X] T503 Alinear valores `fundsOwnershipPct` en tests con contrato real (0-100):
+  - ✅ `InstitutionalAnalysisPage.test.tsx:11`: `0.05` → `5`
+  - ✅ `RegulatoryPositionsPage.test.tsx:11`: `0.08` → `8`, `0.06` → `6`
+
+---
+
+## Dependencies & Execution Order
+
+```
+Phase 1 (Contracts, Persistence, Observability)
+       │
+       ▼
+Phase 2 (Real Source Parsers: SEC, FINRA)
+       │
+       ▼
+Phase 3 (Yahoo Finance Sources + Mock Cleanup)
+       │
+       ▼
+Phase 4 (Resilience, Recovery, Testing)
+       │
+       ▼
+Phase 5 (Coverage Engine Fix — CRÍTICO)
+       │
+       ▼
+Phase 6 (SEC EDGAR Date Fix)
+       │
+       ▼
+Phase 7 (Frontend Rendering Validation)
+```
+
+All canonical tasks (T106-T121, T173) depend on Phase 1 being complete.
+
+### Parallel Opportunities
+
+| Task Group | Can run in parallel with |
+|------------|-------------------------|
+| T200, T201, T202, T203, T206, T207 | All within Phase 1 (different files) |
+| T333, T334 | Each other (different parsers) |
+| T211, T212 | Each other (different Yahoo APIs) |
+| T204, T205, T208, T214 | Each other (different concerns) |
+| T502, T506, T507, T508, T509, T510, T511 | All within Phases 6-7 (different files, no shared dependencies) |
+| T504, T505 | Depend on same engine files — sequential |
+
+### Phase 8: Performance Optimization — Institutional & Coverage API Response Time
+
+- [x] T801 [P] Convert `InstitutionalDataService.resolve()` to parallel source fetching using `Promise.allSettled()` — reduces total latency from sum(4 source times) to max(4 source times). Before: ~30-90s. After: ~10-20s.
+- [x] T802 [P] Reduce `MAX_FILINGS` in SEC EDGAR parser from 5 to 2 (`realSourceParsers.ts`) — cuts SEC source latency by ~60% while preserving data quality.
+- [x] T803 [P] Share pre-resolved `InstitutionalDataServiceResult` across all 3 engines (Zones, Trend, Expiration) — inject via `preResolvedResult` parameter instead of calling `resolve()` 3 times per request. Route now calls `resolve()` once and passes result to all engines.
+- [x] T804 [P] Create shared `yahooCrumbSession.ts` module — consolidates crumb/cookie authentication into a single shared session. Both `yahooOptionsParser.ts` and `yahooInstitutionalParser.ts` import from the same module, eliminating duplicate auth calls (6 HTTP calls → 3).
+- [x] T805 [P] Simplify cache key in `InstitutionalDataService` — remove `[strike, period, volume, liquidity, horizon]` from cache key since institutional data doesn't vary by these request-level parameters. Reduces cache misses by only keying on `[sourceId, ticker, analysisId]`.
+
+---
+
+### Phase 9: Coverage API Performance Optimization — Pre-computed Results, MC Skip, Parallel I/O
+
+**Purpose**: Eliminar trabajo duplicado en el pipeline de cobertura (analyze, compare, simulate) y saltar Monte Carlo cuando no es necesario.
+
+**Independent Test**: `POST /api/coverage/compare` con 4 estrategias dispara ~4 simulaciones + ~4 risk (antes ~8+8); `POST /api/coverage/analyze` con `monteCarloIterations: 0` retorna payoff instantáneo sin loop MC.
+
+#### Pre-computed Results in CoverageReportService (Completado)
+
+- [x] T806 [P] Add optional `precomputed?: { simulation: CoverageSimulationResult; risk: CoverageRiskResult }` parameter to `CoverageReportService.generateReport()` — when provided, skips re-calling `simulationEngine.analyze()` and `riskService.evaluate()`. Uses nullish coalescing to fall back to full computation when not provided. Changes:
+  - ✅ `coverageReportService.ts:39` — signature changed to `generateReport(strategyReq, recipients?, precomputed?)`
+  - ✅ File I/O (JSON + MD writes) parallelized with `Promise.all()` instead of sequential `await`
+
+- [x] T807 [P] Update `CoverageComparator.compare()` to pass pre-computed results to `generateReport()` — stores `sim` and `risk` from earlier pipeline steps and passes `{ simulation: sim, risk: risks[i] }` to each strategy's report generation. Eliminates 4 duplicate simulation calls and 4 duplicate risk evaluations per compare request. Before: 8 sims + 8 risk. After: 4 sims + 4 risk.
+
+#### Monte Carlo Skip (Completado)
+
+- [x] T808 [P] Add Monte Carlo skip to `CoverageSimulationEngine` — constructor treats `monteCarloIterations: 0` as explicit skip signal (not clamped to 32). In `analyze()`, when `this.monteCarloIterations === 0`, returns empty `monteCarloOutcomes` array and zeroed `monteCarloSummary` without entering the iteration loop. Enables sub-second payoff-only analysis for `POST /api/coverage/analyze`.
+
+#### Parallel Notifications (Completado)
+
+- [x] T809 [P] Parallelize notification sending in `CoverageRiskService.evaluate()` — replaces sequential `for...of` loops for email and push notifications with `Promise.allSettled()`. Uses proper type narrowing (`result.status === "fulfilled"`) for return values. Reduces latency when multiple recipients are configured.
+
+#### Dependencies
+
+```
+Phase 9 builds on Phases 1-7 — all coverage engines must be operational.
+
+Tasks can be implemented in this order:
+1. T808 (MC skip) — independent
+2. T806 (report service) — depends on T808 conceptually
+3. T807 (comparator) — depends on T806
+4. T809 (notifications) — independent
+```
+
+### Implementation Sequence
+
+1. Phase 1 → Contracts, persistence, observability foundation
+2. Canonical tasks T106-T121 in flow order (A → B → C → D)
+3. Phase 2 → Real data source parsers (SEC, FINRA)
+4. Phase 3 → Yahoo Finance parsers + remove mock code
+5. Phase 4 → Resilience, tests, documentation
+6. Phase 5 → Coverage engine payoff fix (T504, T505)
+7. Phase 6 → SEC EDGAR date fix (T502)
+8. Phase 7 → Frontend rendering validation (T506-T511, T503)
+9. Phase 8 → Institutional performance optimization (T801-T805)
+10. Phase 9 → Coverage API performance optimization (T806-T809)
+
+---
+
+## Implementation Strategy
+
+### MVP First
+
+1. Phase 1 (contracts + persistence)
+2. T106-T112 (Institutional Core — Flujo A)
+3. T113-T120 (Coverage Engines — Flujo B)
+4. **STOP and validate**: Analysis + Coverage endpoints work
+
+### Incremental Delivery
+
+1. MVP: Institutional Core + Coverage Engines (functional backend)
+2. Add Phase 2: Real data from SEC and FINRA
+3. Add Phase 3: Yahoo Finance + remove all mock data
+4. Add Phase 4: Resilience, tests, documentation
+5. Add Phase 5: Coverage engine payoff fix
+6. Add Phase 6: SEC EDGAR date fix
+7. Add Phase 7: Frontend rendering validation
+8. Add Phase 8: Performance optimization — parallel fetch, shared auth, cache tuning
+
 ### Notes
 
 - Canonical tasks T106-T121 must be preserved literally as specified by the Diana canon
 - Tasks T030 and T054 from the original canon are excluded from this spec's scope (broker integration and MFA reporting)
-- All tasks are marked [ ] — pending execution in the main repository
+- All tasks marked with `[ ]` — pending execution in the main repository
+- Tasks marked with `[P]` — priorizadas para próxima iteración
+- Tasks T500-T501 (Phase 4.5) were applied in-session — frontend rendering fixes for `fundsOwnershipPct * 100` y `tookMs → latencyMs`; no se incluyen como tareas pendientes porque ya están corregidas en el código

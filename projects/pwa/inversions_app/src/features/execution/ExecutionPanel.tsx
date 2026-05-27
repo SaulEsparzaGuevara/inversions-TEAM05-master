@@ -125,7 +125,7 @@ export const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
         setState({
           status: 'failed',
           errorCode: error.code,
-          errorMessage: error.error || 'Execution failed',
+          errorMessage: error.message || error.error || 'Execution failed',
         });
         onExecutionFailed(error.code);
         return;

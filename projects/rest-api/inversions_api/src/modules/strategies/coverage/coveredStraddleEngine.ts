@@ -3,7 +3,12 @@
  * coveredStraddleEngine.ts
  * ============================================================================
  *
- * FIC: T116: Covered Straddle Engine — computes unlimited-risk payoff, margin metrics, and stress alerts for straddle on owned shares.
+ * FIC: T116: Covered Straddle Engine — computes unlimited-risk payoff, margin metrics, and stress alerts for covered strangle on owned shares.
+ *
+ * NOTA TÉCNICA: Aunque el `kind` se mantiene como "covered_straddle" por
+ * compatibilidad de contratos, la estructura implementada es un **covered
+ * strangle** (put short + call short en strikes distintos, cubierto por
+ * acciones long). Un straddle puro requeriría ambas opciones al mismo strike.
  */
 
 import { createCoverageStrategyContract, type CoverageStrategyContract } from "./coverageStrategyContract.js";
@@ -11,7 +16,6 @@ import {
   clamp01,
   createCoverageStrategyResult,
   round,
-  toContractScale,
   type Alert,
   type CoverageStrategyResult,
   type PayoffPoint
@@ -35,13 +39,12 @@ export class CoveredStraddleEngine {
     const currentPrice = this.resolveCurrentPrice(strategy);
     const shortPut = this.findLeg(strategy, "put", "short");
     const shortCall = this.findLeg(strategy, "call", "short");
-    const contractScale = toContractScale(strategy.shares, strategy.legs[0]?.multiplier);
     const netPremiumPerShare = this.calculateNetPremiumPerShare(strategy);
     const marginRequirement = this.calculateMarginRequirement(strategy, currentPrice, shortPut.strike, shortCall.strike, netPremiumPerShare);
     const maxProfitPerShare = Math.max(0, shortCall.strike - currentPrice + netPremiumPerShare);
     const stopLossPrice = this.deriveCriticalStopPrice(currentPrice, shortPut.strike);
 
-    const payoff = this.buildPayoffSimulation(strategy, currentPrice, shortPut.strike, shortCall.strike, netPremiumPerShare, contractScale);
+    const payoff = this.buildPayoffSimulation(strategy, currentPrice, shortPut.strike, shortCall.strike, netPremiumPerShare);
     const riskMetrics = {
       riskProfile: "unlimited" as const,
       maxProtection: round(Math.max(0, currentPrice - shortPut.strike) * strategy.shares, 2),
@@ -101,10 +104,9 @@ export class CoveredStraddleEngine {
 
   private calculateNetPremiumPerShare(strategy: CoverageStrategyContract): number {
     return strategy.legs.reduce((sum, leg) => {
-      const legScale = toContractScale(strategy.shares, leg.multiplier);
       const signedPremium = leg.side === "long" ? -leg.premium : leg.premium;
-      return sum + signedPremium * legScale;
-    }, 0) / Math.max(1, strategy.shares);
+      return sum + signedPremium;
+    }, 0);
   }
 
   private buildPayoffSimulation(
@@ -112,18 +114,17 @@ export class CoveredStraddleEngine {
     currentPrice: number,
     putStrike: number,
     callStrike: number,
-    netPremiumPerShare: number,
-    contractScale: number
+    netPremiumPerShare: number
   ) {
     const moves = [-0.7, -0.5, -0.35, -0.2, -0.1, 0, 0.1, 0.2, 0.35, 0.5, 0.7];
-    const points = moves.map((movePct) => this.simulatePoint(strategy, currentPrice, putStrike, callStrike, netPremiumPerShare, contractScale, movePct));
+    const points = moves.map((movePct) => this.simulatePoint(strategy, currentPrice, putStrike, callStrike, netPremiumPerShare, movePct));
 
     return {
       baselinePrice: round(currentPrice, 2),
       breakevenPrice: round(currentPrice - netPremiumPerShare, 2),
       maxProfit: round(Math.max(0, callStrike - currentPrice + netPremiumPerShare) * strategy.shares, 2),
       maxLoss: null,
-      description: "Premios por call y put cortas; la volatilidad extrema tensiona margen y riesgo direccional.",
+      description: "Estructura covered strangle: el call short está parcialmente cubierto por las acciones long, limitando el riesgo al alza en la práctica. El riesgo ilimitado real es a la baja vía el put short. La volatilidad extrema tensiona margen y exposición direccional.",
       points
     };
   }
@@ -134,13 +135,12 @@ export class CoveredStraddleEngine {
     putStrike: number,
     callStrike: number,
     netPremiumPerShare: number,
-    contractScale: number,
     movePct: number
   ): PayoffPoint {
     const scenarioPrice = Math.max(0.01, currentPrice * (1 + movePct));
     const stockPnL = (scenarioPrice - currentPrice) * strategy.shares;
-    const shortPutPnL = -Math.max(0, putStrike - scenarioPrice) * contractScale;
-    const shortCallPnL = -Math.max(0, scenarioPrice - callStrike) * contractScale;
+    const shortPutPnL = -Math.max(0, putStrike - scenarioPrice) * strategy.shares;
+    const shortCallPnL = -Math.max(0, scenarioPrice - callStrike) * strategy.shares;
     const premiumIncome = netPremiumPerShare * strategy.shares;
     const pnl = stockPnL + premiumIncome + shortPutPnL + shortCallPnL;
 
@@ -215,7 +215,7 @@ export class CoveredStraddleEngine {
       alerts.push({
         code: "STRADDLE_STOP_LOSS",
         severity: "critical",
-        message: "El precio cruzo el nivel critico de stop-loss del covered straddle.",
+        message: "El precio cruzo el nivel critico de stop-loss del covered strangle.",
         recommendation: "Reducir o cerrar la estructura para limitar la expansion del riesgo.",
         triggerPrice: stopLossPrice
       });
@@ -225,7 +225,7 @@ export class CoveredStraddleEngine {
       alerts.push({
         code: "STRADDLE_RANGE_BREAK",
         severity: "warning",
-        message: "La volatilidad saco al subyacente fuera del rango central de la estructura.",
+        message: "La volatilidad saco al subyacente fuera del rango central del covered strangle.",
         recommendation: "Rebalancear cobertura y revisar los requerimientos de margen.",
         triggerPct: this.criticalMovePct
       });
@@ -244,7 +244,7 @@ export class CoveredStraddleEngine {
     alerts.push({
       code: "HIGH_VOLATILITY_PROFILE",
       severity: "info",
-      message: "El covered straddle fue evaluado bajo escenarios de alta volatilidad.",
+      message: "El covered strangle fue evaluado bajo escenarios de alta volatilidad.",
       recommendation: "Usar el stress test para monitorear expansion de riesgo y captura de prima."
     });
 

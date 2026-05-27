@@ -222,7 +222,7 @@ export const SuperChart: React.FC<SuperChartProps> = ({
     // FIC: Find and highlight the selected signal (EN)
     // FIC: Encontrar y resaltar la señal seleccionada (ES)
     const relevantSignals = signals.map((mark) => {
-      if (mark.signal?.id === selectedSignal?.id) {
+      if (mark.signal?.id === selectedSignal?.signalId || mark.signal?.id === selectedSignal?.id) {
         return {
           ...mark,
           color: "#fbbf24",

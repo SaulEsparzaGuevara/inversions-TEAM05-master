@@ -6,7 +6,7 @@
  * FIC: Coverage simulation page — 4 strategy cards with Recharts payoff chart, metrics, alerts, ranked recommendations.
  */
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   postCoverageAnalyze,
   type CoverageAnalyzeRequest,
@@ -70,6 +70,7 @@ function StrategyCard({ result }: { result: CoverageStrategyResult }) {
         <PayoffChart
           points={payoff.points}
           baselinePrice={payoff.baselinePrice}
+          breakevenPrice={payoff.breakevenPrice}
           height={220}
         />
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", fontSize: "0.85rem" }}>
@@ -140,6 +141,8 @@ export function CoverageStrategiesPage() {
 
   const hasStrikes = strikesInput.trim().length > 0;
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const handleAnalyze = useCallback(async () => {
     const price = parseFloat(currentPrice);
     const shareCount = parseInt(shares, 10);
@@ -159,6 +162,11 @@ export function CoverageStrategiesPage() {
       return;
     }
 
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const payload: CoverageAnalyzeRequest = {
       ticker: ticker.trim().toUpperCase(),
       currentPrice: price,
@@ -171,12 +179,17 @@ export function CoverageStrategiesPage() {
     setResults(null);
 
     try {
-      const response = await postCoverageAnalyze(payload);
-      setResults(response.results);
+      const response = await postCoverageAnalyze(payload, controller.signal);
+      if (!controller.signal.aborted) {
+        setResults(response.results);
+      }
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Error al analizar coberturas");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [ticker, currentPrice, shares, strikesInput]);
 

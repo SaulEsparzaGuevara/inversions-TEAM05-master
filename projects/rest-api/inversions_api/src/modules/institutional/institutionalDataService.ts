@@ -43,7 +43,8 @@ export type InstitutionalSourceStatus =
   | "cached"
   | "rate_limited"
   | "failed"
-  | "error";
+  | "error"
+  | "skipped";
 
 /**
  * Error normalizado por fuente.
@@ -299,7 +300,8 @@ export function isInstitutionalSourceReport(value: unknown): value is Institutio
       report.status === "cached" ||
       report.status === "rate_limited" ||
       report.status === "failed" ||
-      report.status === "error") &&
+      report.status === "error" ||
+      report.status === "skipped") &&
     typeof report.cacheHit === "boolean" &&
     isFiniteNumber(report.latencyMs) &&
     isNonEmptyString(report.fetchedAt) &&
@@ -365,97 +367,46 @@ export class InstitutionalDataService {
   }
 
   /**
-   * Resolves institutional data using the configured sources.
+   * Resolves institutional data by running all enabled sources IN PARALLEL.
+   *
+   * POR QUÉ PARALELO (vs secuencial anterior):
+   * - SEC EDGAR puede tardar 30-60s, FINRA ~5s, Yahoo Options ~8s, Yahoo Inst ~8s.
+   * - En secuencial: tiempo total ≈ suma de todos = 51-86s.
+   * - En paralelo: tiempo total ≈ max(individual) = 30-60s (limitado por SEC).
+   * - Promise.allSettled asegura que fuentes lentas no bloqueen a las rápidas,
+   *   y que un error en una fuente no cancele las demás.
    */
   async resolve(request: InstitutionalAnalysisContract): Promise<InstitutionalDataServiceResult> {
     const normalizedRequest = createInstitutionalAnalysisContract(request);
     const sourceReports: InstitutionalSourceReport[] = [];
     const observations: InstitutionalSourceObservation[] = [];
 
-    for (const source of this.sources) {
+    // First pass: handle disabled sources synchronously (cheap, no I/O)
+    const enabledSources = this.sources.filter((source) => {
       if (!source.enabled) {
         sourceReports.push(this.buildSkippedReport(source, "failed", "SOURCE_DISABLED", "Source is disabled", false, 0));
-        continue;
+        return false;
       }
+      return true;
+    });
 
-      const cached = this.getCachedObservation(source, normalizedRequest);
-      if (cached) {
-        sourceReports.push({
-          sourceId: source.sourceId,
-          kind: source.kind,
-          tier: source.tier,
-          enabled: source.enabled,
-          status: "cached",
-          cacheHit: true,
-          latencyMs: 0,
-          fetchedAt: cached.asOf,
-          observation: cached
-        });
-        observations.push(cached);
-        continue;
-      }
+    // Second pass: run all enabled sources IN PARALLEL via Promise.allSettled
+    // All errors are caught internally by resolveSingleSource, so .allSettled
+    // is just a safety net — individual source failures never reject the aggregate.
+    const parallelResults = await Promise.allSettled(
+      enabledSources.map((source) => this.resolveSingleSource(source, normalizedRequest))
+    );
 
-      const rateLimited = this.isRateLimited(source);
-      if (rateLimited) {
-        sourceReports.push(
-          this.buildSkippedReport(
-            source,
-            "rate_limited",
-            "RATE_LIMITED",
-            `Rate limit reached for ${source.sourceId}`,
-            false,
-            0
-          )
-        );
-        continue;
-      }
-
-      const startedAt = this.now();
-      this.registerRateAttempt(source);
-
-      try {
-        const observation = await this.fetchAndNormalizeSource(source, normalizedRequest);
-        if (!observation) {
-          sourceReports.push(
-            this.buildSkippedReport(
-              source,
-              "failed",
-              "EMPTY_OR_UNSUPPORTED_RESPONSE",
-              `Source ${source.sourceId} returned no usable institutional signal`,
-              true,
-              this.now() - startedAt
-            )
-          );
-          continue;
+    for (const result of parallelResults) {
+      if (result.status === "fulfilled") {
+        const { report, observation } = result.value;
+        sourceReports.push(report);
+        if (observation) {
+          observations.push(observation);
         }
-
-        this.setCache(source, normalizedRequest, observation);
-        observations.push(observation);
-        sourceReports.push({
-          sourceId: source.sourceId,
-          kind: source.kind,
-          tier: source.tier,
-          enabled: source.enabled,
-          status: "ok",
-          cacheHit: false,
-          latencyMs: this.now() - startedAt,
-          fetchedAt: observation.asOf,
-          observation
-        });
-      } catch (error) {
-        const normalized = this.normalizeSourceError(source, error);
-        sourceReports.push({
-          sourceId: source.sourceId,
-          kind: source.kind,
-          tier: source.tier,
-          enabled: source.enabled,
-          status: "error",
-          cacheHit: false,
-          latencyMs: this.now() - startedAt,
-          fetchedAt: new Date(this.now()).toISOString(),
-          error: normalized
-        });
       }
+      // result.status === "rejected" should never happen because
+      // resolveSingleSource catches all errors internally.
     }
 
     const anyDataReturned = observations.length > 0;
@@ -464,7 +415,9 @@ export class InstitutionalDataService {
       : normalizedRequest;
 
     const cacheHit = sourceReports.every((report) => report.status === "cached");
-    const allOk = sourceReports.every((r) => r.status === "ok" || r.status === "cached");
+    const allOk = sourceReports.every(
+      (r) => r.status === "ok" || r.status === "cached" || r.status === "skipped"
+    );
 
     const overallStatus: InstitutionalOverallStatus = !anyDataReturned
       ? "all_failed"
@@ -487,6 +440,107 @@ export class InstitutionalDataService {
   async resolveAnalysis(request: InstitutionalAnalysisContract): Promise<InstitutionalAnalysisContract> {
     const result = await this.resolve(request);
     return result.analysis;
+  }
+
+  /**
+   * Resolves a single source and returns its report + observation (or null).
+   *
+   * This method is called in parallel by resolve() for ALL enabled sources.
+   * It handles cache hits, rate limiting, HTTP errors, and parse failures
+   * internally so the caller never needs to catch — every outcome is encoded
+   * in the returned InstitutionalSourceReport.
+   */
+  private async resolveSingleSource(
+    source: InstitutionalSourceConfig,
+    request: InstitutionalAnalysisContract
+  ): Promise<{ report: InstitutionalSourceReport; observation: InstitutionalSourceObservation | null }> {
+    // Check cache first (fast, no I/O)
+    const cached = this.getCachedObservation(source, request);
+    if (cached) {
+      return {
+        report: {
+          sourceId: source.sourceId,
+          kind: source.kind,
+          tier: source.tier,
+          enabled: source.enabled,
+          status: "cached",
+          cacheHit: true,
+          latencyMs: 0,
+          fetchedAt: cached.asOf,
+          observation: cached
+        },
+        observation: cached
+      };
+    }
+
+    // Check rate limit
+    if (this.isRateLimited(source)) {
+      return {
+        report: this.buildSkippedReport(
+          source,
+          "rate_limited",
+          "RATE_LIMITED",
+          `Rate limit reached for ${source.sourceId}`,
+          false,
+          0
+        ),
+        observation: null
+      };
+    }
+
+    // Fetch and normalize (I/O-bound — runs in parallel with other sources)
+    const startedAt = this.now();
+    this.registerRateAttempt(source);
+
+    try {
+      const observation = await this.fetchAndNormalizeSource(source, request);
+      if (!observation) {
+        return {
+          report: this.buildSkippedReport(
+            source,
+            "failed",
+            "EMPTY_OR_UNSUPPORTED_RESPONSE",
+            `Source ${source.sourceId} returned no usable institutional signal`,
+            true,
+            this.now() - startedAt
+          ),
+          observation: null
+        };
+      }
+
+      this.setCache(source, request, observation);
+      return {
+        report: {
+          sourceId: source.sourceId,
+          kind: source.kind,
+          tier: source.tier,
+          enabled: source.enabled,
+          status: "ok",
+          cacheHit: false,
+          latencyMs: this.now() - startedAt,
+          fetchedAt: observation.asOf,
+          observation
+        },
+        observation
+      };
+    } catch (error) {
+      const normalized = this.normalizeSourceError(source, error);
+      const isNotApplicable = normalized.code === "NOT_APPLICABLE";
+      return {
+        report: {
+          sourceId: source.sourceId,
+          kind: source.kind,
+          tier: source.tier,
+          enabled: source.enabled,
+          status: isNotApplicable ? "skipped" : "error",
+          cacheHit: false,
+          latencyMs: this.now() - startedAt,
+          fetchedAt: new Date(this.now()).toISOString(),
+          error: normalized
+        },
+        observation: null
+      };
+    }
   }
 
   private createNativeFetch(): FetchLike {
@@ -1157,20 +1211,10 @@ export class InstitutionalDataService {
   }
 
   private getCacheKey(source: InstitutionalSourceConfig, request: InstitutionalAnalysisContract): string {
-    return JSON.stringify({
-      sourceId: source.sourceId,
-      ticker: request.ticker,
-      instrument: request.instrument,
-      strike: request.strike,
-      period: request.period,
-      volume: request.volume,
-      liquidity: request.liquidity,
-      horizon: request.horizon,
-      fundsOwnershipPct: request.fundsOwnershipPct,
-      flows: request.flows,
-      openPositions: request.openPositions,
-      sourceIds: request.sourceIds ?? []
-    });
+    // Cache key = sourceId + ticker + period. SEC EDGAR 13F retorna diferentes
+    // period_ending según el rango de búsqueda (daily/weekly vs quarterly), por
+    // lo que incluir period evita obsolescencia de datos cross-period.
+    return `${source.sourceId}:${request.ticker}:${request.period}`;
   }
 
   private getCachedObservation(
@@ -1266,6 +1310,17 @@ export class InstitutionalDataService {
 
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
+
+      // Check for NOT_APPLICABLE code first (custom error for intentionally skipped sources)
+      if ((error as Error & { code?: string }).code === "NOT_APPLICABLE") {
+        return {
+          sourceId: source.sourceId,
+          kind: source.kind,
+          code: "NOT_APPLICABLE",
+          message: error.message,
+          retryable: false
+        };
+      }
 
       if (message.includes("timeout") || message.includes("abort")) {
         return {

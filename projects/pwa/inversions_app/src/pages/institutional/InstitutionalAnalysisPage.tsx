@@ -6,12 +6,14 @@
  * FIC: Institutional analysis page — S/R zones table, trend card, metrics, catalyst windows, source reports.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   getInstitutionalAnalysis,
+  getSourceTooltipText,
   type InstitutionalAnalysisResponse,
   type InstitutionalZone
 } from "../../services/institutional/institutionalApi";
+import { Tooltip, type TooltipAccent } from "../../components/ui/Tooltip";
 
 const periods = [
   { value: "intraday", label: "Intradía" },
@@ -87,23 +89,42 @@ export function InstitutionalAnalysisPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InstitutionalAnalysisResponse | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const fetchAnalysis = useCallback(async () => {
     if (!ticker.trim()) return;
+    // Cancel any in-flight request before starting a new one
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError(null);
     try {
-      const result = await getInstitutionalAnalysis({ ticker: ticker.trim(), period, horizon });
-      setData(result);
+      const result = await getInstitutionalAnalysis(
+        { ticker: ticker.trim(), period, horizon },
+        controller.signal
+      );
+      if (!controller.signal.aborted) {
+        setData(result);
+      }
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Error al cargar análisis");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [ticker, period, horizon]);
 
+  // Fetch on mount; abort on unmount. Manual re-fetch via "Buscar" button.
   useEffect(() => {
     void fetchAnalysis();
+    return () => {
+      abortRef.current?.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -171,12 +192,32 @@ export function InstitutionalAnalysisPage() {
         </div>
       )}
 
-      {/* Loading Skeleton */}
+      {/* Loading Skeleton (first load) */}
       {loading && !data && (
         <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           <div className="skeleton" style={{ height: "20px", width: "60%" }} />
           <div className="skeleton" style={{ height: "20px", width: "40%" }} />
           <div className="skeleton" style={{ height: "100px" }} />
+        </div>
+      )}
+
+      {/* Refreshing overlay (re-fetch with existing data) */}
+      {loading && data && (
+        <div style={{
+          position: "relative",
+          height: "3px",
+          overflow: "hidden",
+          borderRadius: "2px",
+          background: "var(--color-border-subtle)"
+        }}>
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            width: "30%",
+            background: "linear-gradient(90deg, transparent, var(--color-accent), transparent)",
+            animation: "skeleton-loading 1.2s ease-in-out infinite",
+            borderRadius: "2px"
+          }} />
         </div>
       )}
 
@@ -205,7 +246,7 @@ export function InstitutionalAnalysisPage() {
               <div style={{ display: "flex", gap: "1rem", marginTop: "0.75rem", fontSize: "0.8rem", color: "var(--color-text-muted)" }}>
                 <span>Soporte: {(data.trends.supportStrength * 100).toFixed(0)}%</span>
                 <span>Resistencia: {(data.trends.resistanceStrength * 100).toFixed(0)}%</span>
-                <span>Flujo: {(data.trends.flowBias * 100).toFixed(0)}%</span>
+                <span>Flujo: ${(data.trends.flowBias / 1e6).toFixed(2)}M</span>
               </div>
             </div>
 
@@ -287,10 +328,23 @@ export function InstitutionalAnalysisPage() {
                     <span style={{ color: "var(--color-text-muted)", marginLeft: "0.5rem" }}>— {report.kind}</span>
                   </div>
                   <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                    <span className={`badge badge-${report.status === "ok" ? "low" : report.status === "cached" ? "medium" : "high"}`}>
-                      {report.status === "ok" ? "OK" : report.status === "cached" ? "Cache" : "Error"}
-                    </span>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "0.75rem" }}>{report.tookMs}ms</span>
+                    <Tooltip
+                      text={getSourceTooltipText(report)}
+                      accent={report.status as TooltipAccent}
+                    >
+                      <span className={`badge badge-${
+                        report.status === "ok" ? "low" :
+                        report.status === "cached" || report.status === "skipped" || report.status === "rate_limited" ? "medium" :
+                        "high"
+                      }`}>
+                        {report.status === "ok" ? "OK" :
+                         report.status === "cached" ? "Cache" :
+                         report.status === "skipped" ? "No aplica" :
+                         report.status === "rate_limited" ? "Límite" :
+                         "Error"}
+                      </span>
+                    </Tooltip>
+                    <span style={{ color: "var(--color-text-muted)", fontSize: "0.75rem" }}>{report.latencyMs}ms</span>
                   </div>
                 </div>
               ))}

@@ -14,7 +14,6 @@ import {
   clamp01,
   createCoverageSimulationResult,
   round,
-  toContractScale,
   type CoverageBacktestObservation,
   type CoverageBacktestSummary,
   type CoverageHistoricalCandle,
@@ -103,7 +102,9 @@ export class CoverageSimulationEngine {
   private readonly monteCarloIterations: number;
 
   constructor(options: CoverageSimulationEngineOptions = {}) {
-    this.monteCarloIterations = Math.max(32, options.monteCarloIterations ?? 256);
+    this.monteCarloIterations = options.monteCarloIterations === 0
+      ? 0
+      : Math.max(32, options.monteCarloIterations ?? 256);
   }
 
   /**
@@ -119,8 +120,12 @@ export class CoverageSimulationEngine {
     const deterministicScenarios = scenarios.map((scenario) =>
       this.simulateScenario(strategy, currentPrice, scenario.movePct, "deterministic", scenario.label, scenario.probability, scenario.notes)
     );
-    const monteCarloOutcomes = this.runMonteCarlo(strategy, currentPrice, historicalCandles, options.randomSeed ?? this.seedFromStrategy(strategy));
-    const monteCarlo = this.summarizeMonteCarlo(monteCarloOutcomes);
+    const monteCarloOutcomes = this.monteCarloIterations > 0
+      ? this.runMonteCarlo(strategy, currentPrice, historicalCandles, options.randomSeed ?? this.seedFromStrategy(strategy))
+      : [];
+    const monteCarlo = this.monteCarloIterations > 0
+      ? this.summarizeMonteCarlo(monteCarloOutcomes)
+      : { iterations: 0, expectedPnL: 0, medianPnL: 0, bestPnL: 0, worstPnL: 0, standardDeviation: 0, valueAtRisk95: 0, expectedShortfall95: 0, winRate: 0, lossRate: 0 };
     const backtestObservations = this.runBacktest(strategy, currentPrice, historicalCandles);
     const backtest = this.summarizeBacktest(backtestObservations);
 
@@ -217,24 +222,23 @@ export class CoverageSimulationEngine {
 
   private calculatePnL(strategy: CoverageStrategyContract, currentPrice: number, scenarioPrice: number): number {
     const stockPnL = (scenarioPrice - currentPrice) * strategy.shares;
-    const contractScale = toContractScale(strategy.shares, strategy.legs[0]?.multiplier);
 
     const optionPremiumCashFlow = strategy.legs.reduce((sum, leg) => {
       const signedPremium = leg.side === "long" ? -leg.premium : leg.premium;
-      return sum + signedPremium * toContractScale(strategy.shares, leg.multiplier);
+      return sum + signedPremium * strategy.shares;
     }, 0);
 
     const optionPayoff = strategy.legs.reduce((sum, leg) => {
       if (leg.type === "call") {
         const payoff = Math.max(0, scenarioPrice - leg.strike);
-        return sum + (leg.side === "long" ? payoff : -payoff) * toContractScale(strategy.shares, leg.multiplier);
+        return sum + (leg.side === "long" ? payoff : -payoff) * strategy.shares;
       }
 
       const payoff = Math.max(0, leg.strike - scenarioPrice);
-      return sum + (leg.side === "long" ? payoff : -payoff) * toContractScale(strategy.shares, leg.multiplier);
+      return sum + (leg.side === "long" ? payoff : -payoff) * strategy.shares;
     }, 0);
 
-    return stockPnL + optionPremiumCashFlow + optionPayoff * Math.sign(contractScale || 1);
+    return stockPnL + optionPremiumCashFlow + optionPayoff;
   }
 
   private runMonteCarlo(

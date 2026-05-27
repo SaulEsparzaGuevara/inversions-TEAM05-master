@@ -138,22 +138,31 @@ External Sources & Assumed SLAs:
 - Estrategias desacopladas de broker y frontend.
 - No invadir dominios técnico/noticias/ejecución fuera del alcance TEAM-05.
 - No modificar artefactos canónicos globales `001-inv-spec.md`, `001-inv-plan.md`, `001-inv-tasks.md`.
+- Escala canónica `confidence`: todos los campos `confidence` usan rango decimal [0.00, 1.00]. Ninguna fuente o servicio retorna valores 0-100.
+- Códigos de error estandarizados en fuentes upstream: `HTTP_ERROR`, `TIMEOUT`, `RATE_LIMITED`, `EMPTY_RESPONSE`, `PARSE_ERROR`.
+- Componentes frontend: implementar 3 estados (loading skeleton, error con mensaje, vacío explicativo) y usar optional chaining en accesos anidados.
 
 ## 7) Estrategia de Pruebas
 
-- Unitarias: fórmulas de payoff, validaciones de parámetros, reglas de elegibilidad.
+- Unitarias con aserciones numéricas: fórmulas de payoff, validaciones de parámetros, reglas de elegibilidad. Incluir 3 escenarios fijos con valores esperados:
+  - Protective Put precio=$450.50, shares=100, strike=$440 → pérdida máxima ~$1,050 (detecta error de scaling 100×)
+  - Collar Put mismo precio/strike → rango acotado superior e inferior
+  - Covered Straddle → ingresos por primas vs riesgo ilimitado
 - Integración: flujo contexto -> estrategia -> explicación, incluidos errores de IA.
-- Contratos: validación de esquema de respuestas estructuradas.
+- Contratos: validación de esquema de respuestas estructuradas. Validar que `confidence` usa escala [0.00, 1.00].
 - No funcionales:
   - Cobertura mínima 80% en rutas críticas.
   - Prueba de latencia p95 <= 5s con fallback asíncrono (polling cada 2s, timeout 30s, máximo 15 intentos).
   - Prueba de autorización por rol (`analyst`, `risk_manager`) y bloqueo de ejecución.
   - Prueba de retención y recuperación de trazas a 365 días.
+  - Prueba de degradación de fuentes: verificar que cada fuente fallida reporta `error.code` estandarizado y no bloquea las demás.
+  - Prueba frontend: verificar 3 estados (loading, error, vacío) en cada componente.
 
 Test Fixtures (concrete):
 - Fixture A (Nominal): SPY-like market, normal volatility, liquidity high. Use sample 30-day time series + sample institutional flows. Expect strategy selection: Protective Put at ATM+/-5%.
 - Fixture B (Stress tail): sudden 25% drop in underlying, IV spike; low liquidity. Validate strategy shows increased hedge size and rejects low-OI strikes.
 - Fixture C (Low-liquidity): low ADV, wide spreads; validate system rejects certain strikes and marks `low_liquidity` in evidence.
+- Fixture D (Payoff precision): 3 escenarios con valores numéricos fijos para Protective Put, Collar Put, Covered Straddle. Verificar que payoff de opciones escala correctamente contra número de acciones.
 
 Sensitivity & Acceptance thresholds:
 - Risk/Reward thresholds: define `target_risk_reduction_pct` (default 60%) and `min_expected_return_pct` (e.g., 0.5% over horizon) for strategy acceptance; measurable in unit tests.
@@ -170,6 +179,11 @@ Secuencia recomendada:
 2. Core institucional + core de estrategias.
 3. Servicio de explicación IA + degradación controlada.
 4. Endpoints, observabilidad, pruebas y hardening.
+5. Corrección de payoff en motores de cobertura (T504, T505) — escalado de opciones usa `strategy.shares` en vez de `contractScale`.
+6. Corrección de `enddt` hardcodeado en SEC EDGAR (T502) — fecha dinámica en EFTS search.
+7. Validación de renderizado frontend (T506-T511, T503) — crashes, estados faltantes, tipos incorrectos.
+8. **Phase 8** — Performance Optimization Institutional: parallel fetch, shared crumb session, cache key simplification (T801-T805).
+9. **Phase 9** — Performance Optimization Coverage: pre-computed results, MC skip, parallel I/O, parallel notifications (T806-T809).
 
 ## Reconstruction Procedure (traceability)
 
@@ -197,6 +211,13 @@ Secuencia recomendada:
 - **Gaps**:
   - Pendiente materializar catálogos de escenarios de prueba extremos por mercado.
 
+**Resueltos desde la versión anterior del plan**:
+  - ✅ T504-T505: Payoff scaling corregido (usa `strategy.shares` en vez de `contractScale`) + cálculo real de primas Black-Scholes.
+  - ✅ T502: `enddt` ahora dinámico en EFTS search de SEC EDGAR.
+  - ✅ T506-T511: Frontend rendering validation — crashes, estados, tipos corregidos.
+  - ✅ T801-T805 (Phase 8): Parallel source fetching, shared crumb session, cache key simplification.
+  - ✅ T806-T809 (Phase 9): Pre-computed results, MC skip, parallel I/O, parallel notifications.
+
 ## 10) Siguiente Paso
 
-Ejecutar `run_only="tasks"` para derivar backlog ejecutable desde este plan, preservando no-omisión del canon TEAM-05.
+Ejecutar las tareas priorizadas del `tasks.md`: las tareas pendientes (canónicas T106-T121, T173) permanecen como backlog. Las optimizaciones de rendimiento Phase 8 y Phase 9 están completadas. Próximo paso recomendado: implementar tests de performance para medir la mejora real en latencia.

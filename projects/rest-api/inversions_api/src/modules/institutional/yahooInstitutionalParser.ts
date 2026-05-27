@@ -16,6 +16,9 @@ import {
   type InstitutionalSourceObservation,
   type InstitutionalSourceConfig
 } from "./institutionalDataService.js";
+import {
+  ensureCrumbSession
+} from "./yahooCrumbSession.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -23,34 +26,12 @@ import {
 
 const YAHOO_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 const YAHOO_QUOTE_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary";
-const YAHOO_CRUMB_URL = "https://query2.finance.yahoo.com/v1/test/getcrumb";
-const YAHOO_COOKIE_URL = "https://fc.yahoo.com";
 const REQUEST_TIMEOUT_MS = 10_000;
 
 const YAHOO_HEADERS = {
   "User-Agent": YAHOO_USER_AGENT,
   Accept: "application/json"
 };
-
-// ---------------------------------------------------------------------------
-// Cache for crumb + cookie (module-level, shared with options parser)
-// ---------------------------------------------------------------------------
-
-interface CrumbSession {
-  crumb: string;
-  cookie: string;
-  expiresAt: number;
-}
-
-// Cache de crumb INDEPENDIENTE del parser de options.
-// POR QUÉ SEPARADO: Ambos parsers (options e institutional) usan crumb auth,
-// pero tener caches separados evita que un fallo en un parser invalide la
-// sesión del otro. Además, cada uno puede tener su propio ciclo de refresh
-// sin interferencias.
-let instCrumbSession: CrumbSession | null = null;
-let instCrumbSessionPromise: Promise<CrumbSession> | null = null;
-
-const CRUMB_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 // ---------------------------------------------------------------------------
 // Yahoo API response types
@@ -87,62 +68,16 @@ interface YahooQuoteSummaryResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Crumb authentication (independent cache for isolation)
-// ---------------------------------------------------------------------------
-
-async function ensureInstCrumbSession(): Promise<CrumbSession> {
-  if (instCrumbSession && instCrumbSession.expiresAt > Date.now()) {
-    return instCrumbSession;
-  }
-
-  if (instCrumbSessionPromise) {
-    return instCrumbSessionPromise;
-  }
-
-  instCrumbSessionPromise = (async () => {
-    const cookieResp = await fetch(YAHOO_COOKIE_URL, {
-      headers: YAHOO_HEADERS,
-      redirect: "manual"
-    });
-    const setCookieHeader = cookieResp.headers.get("set-cookie") ?? "";
-    const cookieMatch = setCookieHeader.match(/[A-Za-z0-9]+=[A-Za-z0-9]+/);
-    const cookie = cookieMatch ? cookieMatch[0] : "";
-
-    const crumbResp = await fetch(YAHOO_CRUMB_URL, {
-      headers: {
-        ...YAHOO_HEADERS,
-        Cookie: cookie
-      }
-    });
-    const crumb = crumbResp.ok ? (await crumbResp.text()).trim() : "";
-
-    const session: CrumbSession = {
-      crumb,
-      cookie,
-      expiresAt: Date.now() + CRUMB_TTL_MS
-    };
-
-    instCrumbSession = session;
-    return session;
-  })();
-
-  try {
-    return await instCrumbSessionPromise;
-  } finally {
-    instCrumbSessionPromise = null;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Institutional data fetching
 // ---------------------------------------------------------------------------
 
 /**
  * Fetches institutional ownership data from Yahoo Finance quoteSummary API.
+ * Uses the shared crumb session from yahooCrumbSession.ts.
  */
 async function fetchYahooInstitutional(ticker: string): Promise<YahooQuoteSummaryResponse | null> {
   try {
-    const session = await ensureInstCrumbSession();
+    const session = await ensureCrumbSession();
     const modules = "institutionOwnership,majorHoldersBreakdown";
     const url = `${YAHOO_QUOTE_URL}/${encodeURIComponent(ticker)}?modules=${encodeURIComponent(modules)}&crumb=${encodeURIComponent(session.crumb)}`;
 

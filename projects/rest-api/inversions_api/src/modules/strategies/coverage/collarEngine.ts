@@ -11,7 +11,6 @@ import {
   clamp01,
   createCoverageStrategyResult,
   round,
-  toContractScale,
   type Alert,
   type CoverageStrategyResult,
   type PayoffPoint
@@ -39,16 +38,15 @@ export class CollarEngine {
     const currentPrice = this.resolveCurrentPrice(strategy);
     const putLeg = this.findLeg(strategy, "put", "long");
     const callLeg = this.findLeg(strategy, "call", "short");
-    const contractScale = toContractScale(strategy.shares, strategy.legs[0]?.multiplier);
     const netPremiumPerShare = this.calculateNetPremiumPerShare(strategy);
     const protectionFloorPrice = putLeg.strike - netPremiumPerShare;
-    const protectionCeilingPrice = callLeg.strike + netPremiumPerShare;
+    const protectionCeilingPrice = callLeg.strike - netPremiumPerShare;
     const downsideRisk = Math.max(0, currentPrice - protectionFloorPrice);
     const upsideCap = Math.max(0, protectionCeilingPrice - currentPrice);
     const stopLossLow = putLeg.strike * (1 - this.stopLossBufferPct);
     const stopLossHigh = callLeg.strike * (1 + this.stopLossBufferPct);
 
-    const payoff = this.buildPayoffSimulation(strategy, currentPrice, putLeg.strike, callLeg.strike, netPremiumPerShare, contractScale);
+    const payoff = this.buildPayoffSimulation(strategy, currentPrice, putLeg.strike, callLeg.strike, netPremiumPerShare);
     const riskMetrics = {
       riskProfile: "limited" as const,
       maxProtection: round(Math.max(0, currentPrice - protectionFloorPrice) * strategy.shares, 2),
@@ -108,10 +106,9 @@ export class CollarEngine {
 
   private calculateNetPremiumPerShare(strategy: CoverageStrategyContract): number {
     return strategy.legs.reduce((sum, leg) => {
-      const legScale = toContractScale(strategy.shares, leg.multiplier);
       const signedPremium = leg.side === "long" ? leg.premium : -leg.premium;
-      return sum + signedPremium * legScale;
-    }, 0) / Math.max(1, strategy.shares);
+      return sum + signedPremium;
+    }, 0);
   }
 
   private buildPayoffSimulation(
@@ -119,17 +116,16 @@ export class CollarEngine {
     currentPrice: number,
     putStrike: number,
     callStrike: number,
-    netPremiumPerShare: number,
-    contractScale: number
+    netPremiumPerShare: number
   ) {
     const target = strategy.targetMovePct ?? 0.12;
     const moves = [-0.3, -0.2, -0.1, -0.05, 0, 0.05, target, 0.2];
-    const points = moves.map((movePct) => this.simulatePoint(strategy, currentPrice, putStrike, callStrike, netPremiumPerShare, contractScale, movePct));
+    const points = moves.map((movePct) => this.simulatePoint(strategy, currentPrice, putStrike, callStrike, netPremiumPerShare, movePct));
 
     return {
       baselinePrice: round(currentPrice, 2),
       breakevenPrice: round(currentPrice + netPremiumPerShare, 2),
-      maxProfit: round(Math.max(0, callStrike - currentPrice + netPremiumPerShare) * strategy.shares, 2),
+      maxProfit: round(Math.max(0, callStrike - currentPrice - netPremiumPerShare) * strategy.shares, 2),
       maxLoss: round(Math.max(0, currentPrice - (putStrike - netPremiumPerShare)) * strategy.shares, 2),
       description: "Rango acotado por put largo y call corto con costo neto reducido o credito.",
       points
@@ -142,13 +138,12 @@ export class CollarEngine {
     putStrike: number,
     callStrike: number,
     netPremiumPerShare: number,
-    contractScale: number,
     movePct: number
   ): PayoffPoint {
     const scenarioPrice = Math.max(0.01, currentPrice * (1 + movePct));
     const stockPnL = (scenarioPrice - currentPrice) * strategy.shares;
-    const longPutPnL = Math.max(0, putStrike - scenarioPrice) * contractScale;
-    const shortCallPnL = -Math.max(0, scenarioPrice - callStrike) * contractScale;
+    const longPutPnL = Math.max(0, putStrike - scenarioPrice) * strategy.shares;
+    const shortCallPnL = -Math.max(0, scenarioPrice - callStrike) * strategy.shares;
     const optionCost = netPremiumPerShare * strategy.shares;
     const pnl = stockPnL + longPutPnL + shortCallPnL - optionCost;
 
@@ -177,14 +172,14 @@ export class CollarEngine {
    * - Si el precio sube muy por encima del call strike → riesgo de
    *   asignación de la call corta (te quitan las acciones).
    *
-   * Cada lado contribuye con 0.6 (60%) al score total, lo que significa
-   * que si solo un lado está estresado, el score máximo es 0.6. Si ambos
-   * lados están estresados, puede llegar a 1.0.
+   * Cada lado contribuye hasta 0.5 (50%) al score total, lo que significa
+   * que si solo un lado está estresado, el score máximo es 0.5. Si ambos
+   * lados están estresados, el score llega a 1.0 sin necesidad de clamp.
    */
   private calculateExerciseRisk(currentPrice: number, putStrike: number, callStrike: number): number {
     const downside = Math.max(0, putStrike - currentPrice) / Math.max(1, putStrike);
     const upside = Math.max(0, currentPrice - callStrike) / Math.max(1, callStrike);
-    return clamp01(downside * 0.6 + upside * 0.6);
+    return clamp01(downside * 0.5 + upside * 0.5);
   }
 
   private calculateVolatilityStress(
@@ -211,6 +206,16 @@ export class CollarEngine {
     const alerts: Alert[] = [];
     const lowTrigger = putStrike * (1 - this.stopLossBufferPct);
     const highTrigger = callStrike * (1 + this.stopLossBufferPct);
+
+    if (callStrike <= currentPrice) {
+      alerts.push({
+        code: "COLLAR_CALL_BELOW_MARKET",
+        severity: "warning",
+        message: "El strike del call short esta por debajo del precio actual, lo que genera un collar invertido. Verificar configuracion.",
+        recommendation: "Aumentar el strike del call short por encima del precio actual o seleccionar un put con mayor prima.",
+        triggerPrice: callStrike
+      });
+    }
 
     if (currentPrice <= lowTrigger) {
       alerts.push({

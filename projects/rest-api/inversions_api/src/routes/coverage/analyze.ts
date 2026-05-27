@@ -5,6 +5,7 @@ import { CollarEngine } from "../../modules/strategies/coverage/collarEngine.js"
 import { CoveredStraddleEngine } from "../../modules/strategies/coverage/coveredStraddleEngine.js";
 import { createCoverageStrategyContract, isFiniteNumber, isNonEmptyString, type CoverageStrategyContract, type CoverageStrategyKind } from "../../modules/strategies/coverage/coverageStrategyContract.js";
 import type { CoverageOptionLeg } from "../../modules/strategies/coverage/coverageStrategyContract.js";
+import { estimateOptionPremium } from "../../modules/strategies/coverage/coverageTypes.js";
 
 const supportedRoles = ["analyst", "risk_manager", "trader"];
 
@@ -24,6 +25,16 @@ function buildContracts(body: AnalyzeBody): CoverageStrategyContract[] {
   const cp = body.currentPrice ?? 450;
   const expiry = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
+  function estimatePremium(type: "call" | "put", strike: number): number {
+    return estimateOptionPremium({
+      underlyingPrice: cp,
+      strike,
+      type,
+      daysToExpiry: 90,
+      impliedVol: 0.25
+    });
+  }
+
   function legsForKind(kind: CoverageStrategyKind): CoverageOptionLeg[] {
     if (body.legs && body.legs.length > 0) return body.legs;
 
@@ -34,16 +45,16 @@ function buildContracts(body: AnalyzeBody): CoverageStrategyContract[] {
     switch (kind) {
       case "protective_put":
       case "married_put":
-        return [{ type: "put", side: "long", strike: putStrike, premium: 0, expiration: expiry, multiplier: 100 }];
+        return [{ type: "put", side: "long", strike: putStrike, premium: estimatePremium("put", putStrike), expiration: expiry, multiplier: 100 }];
       case "collar_put":
         return [
-          { type: "put", side: "long", strike: putStrike, premium: 0, expiration: expiry, multiplier: 100 },
-          { type: "call", side: "short", strike: callStrike, premium: 0, expiration: expiry, multiplier: 100 }
+          { type: "put", side: "long", strike: putStrike, premium: estimatePremium("put", putStrike), expiration: expiry, multiplier: 100 },
+          { type: "call", side: "short", strike: callStrike, premium: estimatePremium("call", callStrike), expiration: expiry, multiplier: 100 }
         ];
       case "covered_straddle":
         return [
-          { type: "put", side: "short", strike: putStrike, premium: 0, expiration: expiry, multiplier: 100 },
-          { type: "call", side: "short", strike: callStrike, premium: 0, expiration: expiry, multiplier: 100 }
+          { type: "put", side: "short", strike: putStrike, premium: estimatePremium("put", putStrike), expiration: expiry, multiplier: 100 },
+          { type: "call", side: "short", strike: callStrike, premium: estimatePremium("call", callStrike), expiration: expiry, multiplier: 100 }
         ];
     }
   }

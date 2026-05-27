@@ -46,14 +46,19 @@ export class CoverageComparator {
 
     const candidateRequests = candidateKinds.map((k) => ({ ...baseRequest, kind: k }));
 
-    // Run simulations in parallel (limited by runners if desired)
+    // Run simulations in parallel
     const simulations = await Promise.all(candidateRequests.map((req) => this.simulationEngine.analyze(req)));
 
-    // Evaluate risk for each simulation
+    // Evaluate risk for each simulation (in parallel)
     const risks = await Promise.all(simulations.map((sim) => this.riskService.evaluate(sim.baseResult, sim, options.recipients)));
 
-    // Produce reports for each candidate (may write exports)
-    const reports = await Promise.all(simulations.map((sim) => this.reportService.generateReport(sim.baseResult.strategy, options.recipients)));
+    // Produce reports — pass pre-computed simulation+risk to avoid re-computation inside generateReport()
+    const reports = await Promise.all(simulations.map((sim, i) =>
+      this.reportService.generateReport(sim.baseResult.strategy, options.recipients, {
+        simulation: sim,
+        risk: risks[i]
+      })
+    ));
 
     // Prepare metrics for normalization
     const expectedPnls = simulations.map((s) => (s.monteCarlo?.expectedPnL ?? s.backtest?.averagePnL ?? 0));

@@ -196,6 +196,46 @@ export function toContractScale(shares: number, multiplier?: number): number {
   return shares / contractMultiplier;
 }
 
+const STANDARD_NORMAL_CDF_COEFFICIENTS = [0.31938153, -0.356563782, 1.781477937, -1.821255978, 1.330274429];
+const STANDARD_NORMAL_CDF_DIVISOR = 0.2316419;
+
+function normalCdf(x: number): number {
+  if (x < -10) return 0;
+  if (x > 10) return 1;
+  const k = 1 / (1 + STANDARD_NORMAL_CDF_DIVISOR * Math.abs(x));
+  let cdf = 1 - Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI);
+  cdf *= k * STANDARD_NORMAL_CDF_COEFFICIENTS[0]
+    + k ** 2 * STANDARD_NORMAL_CDF_COEFFICIENTS[1]
+    + k ** 3 * STANDARD_NORMAL_CDF_COEFFICIENTS[2]
+    + k ** 4 * STANDARD_NORMAL_CDF_COEFFICIENTS[3]
+    + k ** 5 * STANDARD_NORMAL_CDF_COEFFICIENTS[4];
+  return x >= 0 ? 1 - cdf : cdf;
+}
+
+export interface PremiumEstimateParams {
+  underlyingPrice: number;
+  strike: number;
+  type: "call" | "put";
+  daysToExpiry: number;
+  impliedVol?: number;
+  riskFreeRate?: number;
+}
+
+export function estimateOptionPremium(params: PremiumEstimateParams): number {
+  const S = params.underlyingPrice;
+  const K = params.strike;
+  const T = Math.max(1 / 365, params.daysToExpiry / 365);
+  const sigma = params.impliedVol ?? 0.25;
+  const r = params.riskFreeRate ?? 0.05;
+  const d1 = (Math.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * Math.sqrt(T));
+  const d2 = d1 - sigma * Math.sqrt(T);
+
+  if (params.type === "call") {
+    return S * normalCdf(d1) - K * Math.exp(-r * T) * normalCdf(d2);
+  }
+  return K * Math.exp(-r * T) * normalCdf(-d2) - S * normalCdf(-d1);
+}
+
 export interface CoverageHistoricalCandle {
   time: number;
   open: number;

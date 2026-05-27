@@ -6,11 +6,13 @@
  * FIC: Regulatory positions page — 13F table, institutional flow cards, holdings %, source reports with cache indicator.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   getRegulatoryPositions,
+  getSourceTooltipText,
   type RegulatoryPositionsResponse
 } from "../../services/institutional/institutionalApi";
+import { Tooltip, type TooltipAccent } from "../../components/ui/Tooltip";
 
 const periods = [
   { value: "intraday", label: "Intradía" },
@@ -33,23 +35,42 @@ export function RegulatoryPositionsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<RegulatoryPositionsResponse | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const fetchPositions = useCallback(async () => {
     if (!ticker.trim()) return;
+    // Cancel any in-flight request before starting a new one
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError(null);
     try {
-      const result = await getRegulatoryPositions({ ticker: ticker.trim(), period, horizon });
-      setData(result);
+      const result = await getRegulatoryPositions(
+        { ticker: ticker.trim(), period, horizon },
+        controller.signal
+      );
+      if (!controller.signal.aborted) {
+        setData(result);
+      }
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Error al cargar posiciones");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [ticker, period, horizon]);
 
+  // Fetch on mount; abort on unmount. Manual re-fetch via "Buscar" button.
   useEffect(() => {
     void fetchPositions();
+    return () => {
+      abortRef.current?.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -111,12 +132,32 @@ export function RegulatoryPositionsPage() {
         </div>
       )}
 
-      {/* Loading */}
+      {/* Loading Skeleton (first load) */}
       {loading && !data && (
         <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           <div className="skeleton" style={{ height: "20px", width: "50%" }} />
           <div className="skeleton" style={{ height: "20px", width: "30%" }} />
           <div className="skeleton" style={{ height: "120px" }} />
+        </div>
+      )}
+
+      {/* Refreshing bar (re-fetch with existing data) */}
+      {loading && data && (
+        <div style={{
+          position: "relative",
+          height: "3px",
+          overflow: "hidden",
+          borderRadius: "2px",
+          background: "var(--color-border-subtle)"
+        }}>
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            width: "30%",
+            background: "linear-gradient(90deg, transparent, var(--color-accent), transparent)",
+            animation: "skeleton-loading 1.2s ease-in-out infinite",
+            borderRadius: "2px"
+          }} />
         </div>
       )}
 
@@ -160,7 +201,7 @@ export function RegulatoryPositionsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", fontSize: "0.85rem" }}>
                 <div>
                   <span style={{ color: "var(--color-text-muted)" }}>Participación: </span>
-                  <span style={{ color: "var(--color-text)" }}>{(data.analysis.fundsOwnershipPct * 100).toFixed(2)}%</span>
+                    <span style={{ color: "var(--color-text)" }}>{data.analysis.fundsOwnershipPct.toFixed(2)}%</span>
                 </div>
                 <div>
                   <span style={{ color: "var(--color-text-muted)" }}>Posiciones: </span>
@@ -211,7 +252,7 @@ export function RegulatoryPositionsPage() {
                       <td>{new Date(pos.asOf).toLocaleDateString("es-MX")}</td>
                       <td>{pos.count.toLocaleString()}</td>
                       <td>{pos.notional ? `$${(pos.notional / 1e6).toFixed(2)}M` : "—"}</td>
-                      <td>{pos.fundsOwnershipPct !== undefined ? `${(pos.fundsOwnershipPct * 100).toFixed(2)}%` : "—"}</td>
+                      <td>{pos.fundsOwnershipPct !== undefined ? `${pos.fundsOwnershipPct.toFixed(2)}%` : "—"}</td>
                       <td>{pos.volume !== undefined ? pos.volume.toLocaleString() : "—"}</td>
                       <td>
                         <span className={`badge ${pos.confidence >= 0.7 ? "badge-low" : pos.confidence >= 0.4 ? "badge-medium" : "badge-high"}`}>
@@ -247,10 +288,23 @@ export function RegulatoryPositionsPage() {
                       <span style={{ color: "var(--color-text-muted)", marginLeft: "0.5rem" }}>— {report.kind}</span>
                     </div>
                     <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                      <span className={`badge badge-${report.status === "ok" ? "low" : report.status === "cached" ? "medium" : "high"}`}>
-                        {report.status === "ok" ? "OK" : report.status === "cached" ? "Cache" : "Error"}
-                      </span>
-                      <span style={{ color: "var(--color-text-muted)", fontSize: "0.75rem" }}>{report.tookMs}ms</span>
+                      <Tooltip
+                        text={getSourceTooltipText(report)}
+                        accent={report.status as TooltipAccent}
+                      >
+                        <span className={`badge badge-${
+                          report.status === "ok" ? "low" :
+                          report.status === "cached" || report.status === "skipped" || report.status === "rate_limited" ? "medium" :
+                          "high"
+                        }`}>
+                          {report.status === "ok" ? "OK" :
+                           report.status === "cached" ? "Cache" :
+                           report.status === "skipped" ? "No aplica" :
+                           report.status === "rate_limited" ? "Límite" :
+                           "Error"}
+                        </span>
+                      </Tooltip>
+                      <span style={{ color: "var(--color-text-muted)", fontSize: "0.75rem" }}>{report.latencyMs}ms</span>
                     </div>
                   </div>
                 ))}

@@ -190,6 +190,64 @@ Estado actual de las fuentes de datos que alimentan las páginas de Análisis In
 - **US1** can be executed natively in Backend independent of all Frontend.
 - **US2, US3** consume data from Phase 8 (SEC EDGAR, FINRA) and Phase 9 (Yahoo Finance). Implement phases 8+9 before or in parallel with US2/US3.
 - **US4, US5** depend only on Phase 2 being complete (routing, layout, store).
+- **Phase 10** (Frontend API Performance) is additive on top of Phases 1-7 — all pages and API services must already exist. Can be implemented after any of Phases 2-7.
+
+## Phase 10: Frontend API Performance Optimization (Cache, Retry, AbortController)
+
+**Purpose**: Reducir latencia percibida, eliminar llamadas duplicadas y prevenir race conditions en las páginas que consumen APIs lentas (coverage, institutional).
+
+**Independent Test**: Navegar entre páginas del mismo ticker no dispara requests repetidas; cambiar de ticker aborta la request en vuelo; errores 5xx/429 hacen retry automático visible en consola.
+
+### In-Memory Cache Layer (Completado)
+
+- [x] T342 [P] Create `apiCache.ts` in `projects/pwa/inversions_app/src/services/apiCache.ts` — module-level in-memory cache with configurable TTL (default 5 min), generic `getCached<T>()` / `setCache()` / `clearCache()` / `invalidateCache()` API. Cache key is built from URL + JSON-stringified body. Used via import singleton; no React dependency.
+
+### Cache + Retry + AbortSignal in Coverage API (Completado)
+
+- [x] T343 [P] Add cache-before-fetch in `coverageApi.ts` — `postCoverageAnalyze()`, `postCoverageCompare()`, `postCoverageSimulate()` check `getCached()` before fetch, store result via `setCache()` on success. Add `signal?: AbortSignal` parameter to all 3 functions, passed through to native `fetch()`.
+
+- [x] T344 [P] Add `fetchWithRetry()` helper in `coverageApi.ts` — wraps `fetch()` with up to 2 retries on 5xx/429 responses, exponential backoff (1s, 2s), tracks `lastResponse` to avoid extra fetch at loop end. Non-500/429 errors and 2xx propagate immediately.
+
+### Cache + Retry + AbortSignal in Institutional API (Completado)
+
+- [x] T345 [P] Add same cache-before-fetch pattern + `fetchWithRetry()` in `institutionalApi.ts` — `getInstitutionalAnalysis()`, `getRegulatoryPositions()` benefit from in-memory cache across page navigations (eliminates ~90% of repeat calls). Both accept `signal?: AbortSignal`.
+
+### Memoized Auth Headers (Completado)
+
+- [x] T346 [P] Memoize `getAuthHeaders()` in `signalApi.ts` — cache `authToken` (from `localStorage.getItem("inversions.dev.token")` and `import.meta.env`) in module-level variable. Add `invalidateAuthCache()` exported function to reset on logout. Eliminates repeated synchronous localStorage reads on every API call.
+
+### AbortController Integration in Pages (Completado)
+
+- [x] T347 [P] Add AbortController to `InstitutionalAnalysisPage.tsx` — `useRef<AbortController>` stores current controller; `useEffect` cleanup aborts on unmount; new fetch aborts previous in-flight request to prevent race conditions when user changes ticker mid-request.
+
+- [x] T348 [P] Add AbortController to `RegulatoryPositionsPage.tsx` — same pattern: persists controller across re-renders, aborts stale requests on re-fetch and cleanup on unmount.
+
+- [x] T349 [P] Add AbortController to `CoverageStrategiesPage.tsx` — same pattern with `signal` passed to `postCoverageAnalyze()` / `postCoverageCompare()` / `postCoverageSimulate()`.
+
+### Refreshing Overlay UX (Completado)
+
+- [x] T350 [P] Add animated "refreshing" bar to `InstitutionalAnalysisPage.tsx` — when re-fetching with existing data displayed, show a thin animated bar at the top (CSS animation) instead of hiding results. `isRefreshing` state derived from `loading && data !== null`.
+
+- [x] T351 [P] Add same refreshing bar pattern to `RegulatoryPositionsPage.tsx` — consistent UX: skeleton on first load, thin animated bar on subsequent refreshes.
+
+### Test Isolation Fix (Completado)
+
+- [x] T352 [P] Add `clearCache()` call in `beforeEach` of `coverageApi.test.ts` — prevents cross-test pollution from the module-level in-memory cache. All 6 tests pass (3 success + 3 error scenarios).
+
+### Dependencies
+
+```
+Phase 10 is additive on top of Phases 1-9 — all pages and API services must already exist.
+
+Tasks can be implemented in this order:
+1. T342 (apiCache.ts) — prerequisite for T343, T345
+2. T346 (memoized auth) — independent, can run in parallel with T342
+3. T343, T344 (coverageApi.ts) — depends on T342
+4. T345 (institutionalApi.ts) — depends on T342
+5. T347, T348, T349 (AbortController in pages) — depends on T343, T345
+6. T350, T351 (refreshing overlay) — depends on T347, T348
+7. T352 (test isolation) — depends on T342, T343
+```
 
 ## Parallel Example: Backend / Frontend Split
 ```bash

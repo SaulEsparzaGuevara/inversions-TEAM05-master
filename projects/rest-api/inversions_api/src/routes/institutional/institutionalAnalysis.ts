@@ -22,14 +22,17 @@ institutionalAnalysisRouter.use(authContextMiddleware);
 
 institutionalAnalysisRouter.get("/analysis", async (req, res) => {
   try {
-    const { engine, trendEngine, expirationEngine } = getInstitutionalRouteContext();
+    const { engine, trendEngine, expirationEngine, service } = getInstitutionalRouteContext();
     const analysis = buildInstitutionalAnalysisContractFromRequest(req);
 
-    // Execute all three analyses in parallel
+    // Resolve institutional data ONCE and share across all three engines
+    const preResolvedData = await service.resolve(analysis);
+
+    // Execute all three analyses in parallel, sharing the pre-resolved data
     const [zoneResult, trendResult, expirationResult] = await Promise.all([
-      engine.analyze({ analysis }),
-      trendEngine.analyze({ analysis }),
-      expirationEngine.analyze({ analysis })
+      engine.analyze({ analysis }, preResolvedData),
+      trendEngine.analyze({ analysis }, preResolvedData),
+      expirationEngine.analyze({ analysis }, preResolvedData)
     ]);
 
     const groupedZones = groupInstitutionalZones(zoneResult.zones);

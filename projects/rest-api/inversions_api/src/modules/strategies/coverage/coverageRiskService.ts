@@ -67,22 +67,38 @@ export class CoverageRiskService {
       });
     }
 
-    // Enqueue notifications (stubs: use provided senders)
-    if (recipients.email && this.emailSender) {
-      for (const email of recipients.email) {
-        const subject = `[Coverage Alert] ${strategy.ticker} ${strategyResult.strategy.strategyId}`;
-        const body = `Strategy ${strategyResult.strategy.strategyId} reported ${actions.length} actions. Please review.`;
-        const delivered = await this.emailSender(email, subject, body).catch(() => false);
-        notifications.push({ channel: "email", recipient: email, subject, body, delivered, deliveredAt: delivered ? new Date().toISOString() : "" });
+    // Enqueue notifications in parallel (stubs: use provided senders)
+    const emailSender = this.emailSender;
+    if (recipients.email && emailSender) {
+      const emailNotifications = await Promise.allSettled(
+        recipients.email.map(async (email) => {
+          const subject = `[Coverage Alert] ${strategy.ticker} ${strategyResult.strategy.strategyId}`;
+          const body = `Strategy ${strategyResult.strategy.strategyId} reported ${actions.length} actions. Please review.`;
+          const delivered = await emailSender(email, subject, body).catch(() => false);
+          return { channel: "email" as const, recipient: email, subject, body, delivered, deliveredAt: delivered ? new Date().toISOString() : "" };
+        })
+      );
+      for (const result of emailNotifications) {
+        if (result.status === "fulfilled") {
+          notifications.push(result.value);
+        }
       }
     }
 
-    if (recipients.push && this.pushSender) {
-      for (const push of recipients.push) {
-        const title = `Coverage Alert: ${strategy.ticker}`;
-        const body = `${actions.length} actions for ${strategyResult.strategy.strategyId}`;
-        const delivered = await this.pushSender(push, title, body).catch(() => false);
-        notifications.push({ channel: "push", recipient: push, subject: title, body, delivered, deliveredAt: delivered ? new Date().toISOString() : "" });
+    const pushSender = this.pushSender;
+    if (recipients.push && pushSender) {
+      const pushNotifications = await Promise.allSettled(
+        recipients.push.map(async (push) => {
+          const title = `Coverage Alert: ${strategy.ticker}`;
+          const body = `${actions.length} actions for ${strategyResult.strategy.strategyId}`;
+          const delivered = await pushSender(push, title, body).catch(() => false);
+          return { channel: "push" as const, recipient: push, subject: title, body, delivered, deliveredAt: delivered ? new Date().toISOString() : "" };
+        })
+      );
+      for (const result of pushNotifications) {
+        if (result.status === "fulfilled") {
+          notifications.push(result.value);
+        }
       }
     }
 

@@ -16,6 +16,9 @@ import {
   type InstitutionalSourceObservation,
   type InstitutionalSourceConfig
 } from "./institutionalDataService.js";
+import {
+  ensureCrumbSession
+} from "./yahooCrumbSession.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -23,29 +26,12 @@ import {
 
 const YAHOO_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 const YAHOO_OPTIONS_URL = "https://query2.finance.yahoo.com/v7/finance/options";
-const YAHOO_CRUMB_URL = "https://query2.finance.yahoo.com/v1/test/getcrumb";
-const YAHOO_COOKIE_URL = "https://fc.yahoo.com";
 const REQUEST_TIMEOUT_MS = 10_000;
 
 const YAHOO_HEADERS = {
   "User-Agent": YAHOO_USER_AGENT,
   Accept: "application/json"
 };
-
-// ---------------------------------------------------------------------------
-// Cache for crumb + cookie (module-level, like finraCache)
-// ---------------------------------------------------------------------------
-
-interface CrumbSession {
-  crumb: string;
-  cookie: string;
-  expiresAt: number;
-}
-
-let crumbSession: CrumbSession | null = null;
-let crumbSessionPromise: Promise<CrumbSession> | null = null;
-
-const CRUMB_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 // ---------------------------------------------------------------------------
 // Helper types for Yahoo API response
@@ -83,84 +69,12 @@ interface YahooOptionsChainResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Crumb authentication
-// ---------------------------------------------------------------------------
-
-/**
- * Obtiene un par crumb + cookie de Yahoo Finance.
- *
- * POR QUÉ CRUMB AUTH: Yahoo Finance requiere autenticación por crumb para
- * sus APIs no oficiales (v7/v10). Sin crumb, las requests devuelven HTTP 401.
- * El flujo es:
- * 1. GET a fc.yahoo.com → obtener cookie de sesión
- * 2. GET a v1/test/getcrumb con la cookie → obtener crumb token
- * 3. Incluir crumb como query param en todas las requests subsiguientes
- *
- * POR QUÉ SHARED-PROMISE DEDUP (ensureCrumbSession): Múltiples parsers
- * (options + institutional) pueden solicitar crumb simultáneamente. El patrón
- * de shared-promise asegura que solo se haga UNA llamada de autenticación,
- * evitando rate limiting innecesario.
- *
- * POR QUÉ TTL DE 15 MIN: La cookie de Yahoo expira aproximadamente a los
- * 20-30 min. Usamos 15 min para tener margen de seguridad.
- */
-async function ensureCrumbSession(): Promise<CrumbSession> {
-  if (crumbSession && crumbSession.expiresAt > Date.now()) {
-    return crumbSession;
-  }
-
-  if (crumbSessionPromise) {
-    return crumbSessionPromise;
-  }
-
-  crumbSessionPromise = (async () => {
-    // PASO 1: Obtener cookie de sesión desde fc.yahoo.com.
-    // redirect: "manual" porque Yahoo redirige a una página principal;
-    // nos interesa solo el header Set-Cookie de la respuesta inicial.
-    const cookieResp = await fetch(YAHOO_COOKIE_URL, {
-      headers: YAHOO_HEADERS,
-      redirect: "manual"
-    });
-    const setCookieHeader = cookieResp.headers.get("set-cookie") ?? "";
-    // Extrae solo el primer par nombre=valor (ej: "B=abc123") ignorando
-    // parámetros adicionales como path, domain, expires.
-    const cookieMatch = setCookieHeader.match(/[A-Za-z0-9]+=[A-Za-z0-9]+/);
-    const cookie = cookieMatch ? cookieMatch[0] : "";
-
-    // PASO 2: Canjear la cookie por un crumb token.
-    // El crumb es un string corto que se pasa como query param ?crumb=xxx
-    // en todas las requests a las APIs v7/v10 de Yahoo.
-    const crumbResp = await fetch(YAHOO_CRUMB_URL, {
-      headers: {
-        ...YAHOO_HEADERS,
-        Cookie: cookie
-      }
-    });
-    const crumb = crumbResp.ok ? (await crumbResp.text()).trim() : "";
-
-    const session: CrumbSession = {
-      crumb,
-      cookie,
-      expiresAt: Date.now() + CRUMB_TTL_MS
-    };
-
-    crumbSession = session;
-    return session;
-  })();
-
-  try {
-    return await crumbSessionPromise;
-  } finally {
-    crumbSessionPromise = null;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Options chain fetching
 // ---------------------------------------------------------------------------
 
 /**
  * Fetches the options chain for a ticker from Yahoo Finance.
+ * Uses the shared crumb session from yahooCrumbSession.ts.
  * Returns the raw API response or null on failure.
  */
 async function fetchYahooOptions(ticker: string): Promise<YahooOptionsChainResponse | null> {

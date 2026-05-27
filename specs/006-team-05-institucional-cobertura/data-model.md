@@ -31,8 +31,9 @@ Reporte individual por fuente de datos externa.
 | `source_id` | `string` | sí | Identificador de la fuente |
 | `kind` | `string` | sí | Tipo de fuente |
 | `label` | `string` | sí | Nombre legible |
-| `status` | `enum` | sí | `"ok"` \| `"error"` \| `"cached"` |
-| `took_ms` | `number` | sí | Tiempo de respuesta en ms |
+| `status` | `enum` | sí | `"ok"` \| `"error"` \| `"cached"` \| `"failed"` \| `"rate_limited"` |
+| `latency_ms` | `number` | sí | Tiempo de respuesta en ms |
+| `error.code` | `string` | no | Código estandarizado: `HTTP_ERROR` \| `TIMEOUT` \| `RATE_LIMITED` \| `EMPTY_RESPONSE` \| `PARSE_ERROR` |
 | `observation` | `object?` | no | Datos observados si status = ok |
 | `observation.as_of` | `string` | no | Timestamp de la observación |
 | `observation.confidence` | `number` [0, 1] | no | Confianza del parser |

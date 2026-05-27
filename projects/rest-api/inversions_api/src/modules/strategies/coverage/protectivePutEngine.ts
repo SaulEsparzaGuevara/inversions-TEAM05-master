@@ -11,7 +11,6 @@ import {
   clamp01,
   createCoverageStrategyResult,
   round,
-  toContractScale,
   type Alert,
   type CoverageStrategyResult,
   type PayoffPoint
@@ -45,16 +44,16 @@ export class ProtectivePutEngine {
 
     const currentPrice = this.resolveCurrentPrice(strategy);
     const putLeg = this.findPutLeg(strategy);
-    const contractScale = this.resolveContractScale(strategy);
     const netPremiumPerShare = this.calculateNetPremiumPerShare(strategy);
     const protectionMaximumPerShare = Math.max(0, putLeg.strike - currentPrice);
     const protectionFloorPrice = putLeg.strike - netPremiumPerShare;
-    const breakEvenPrice = strategy.kind === "married_put"
-      ? currentPrice + netPremiumPerShare
-      : currentPrice - protectionMaximumPerShare + netPremiumPerShare;
-    const stopLossPrice = round(putLeg.strike * (1 - this.stopLossBufferPct), 2);
+    const breakEvenPrice = currentPrice + netPremiumPerShare;
+    const riskBuffer = strategy.riskTolerancePct > 0
+      ? Math.max(0.01, Math.min(0.10, strategy.riskTolerancePct * 0.5))
+      : this.stopLossBufferPct;
+    const stopLossPrice = round(putLeg.strike * (1 - riskBuffer), 2);
 
-    const payoff = this.buildPayoffSimulation(strategy, currentPrice, putLeg.strike, netPremiumPerShare, contractScale);
+    const payoff = this.buildPayoffSimulation(strategy, currentPrice, putLeg.strike, netPremiumPerShare);
     const riskMetrics = {
       riskProfile: "limited" as const,
       maxProtection: round(protectionMaximumPerShare * strategy.shares, 2),
@@ -112,11 +111,6 @@ export class ProtectivePutEngine {
     return Math.max(1, strikeAverage);
   }
 
-  private resolveContractScale(strategy: CoverageStrategyContract): number {
-    const contractMultiplier = strategy.legs[0]?.multiplier;
-    return toContractScale(strategy.shares, contractMultiplier);
-  }
-
   /**
    * Calcula la prima neta POR ACCIÓN de la estrategia.
    *
@@ -132,28 +126,24 @@ export class ProtectivePutEngine {
    * esto dividiendo shares / multiplier.
    */
   private calculateNetPremiumPerShare(strategy: CoverageStrategyContract): number {
-    const premiumSum = strategy.legs.reduce((sum, leg) => {
-      const legScale = toContractScale(strategy.shares, leg.multiplier);
+    return strategy.legs.reduce((sum, leg) => {
       const signedPremium = leg.side === "long" ? leg.premium : -leg.premium;
-      return sum + signedPremium * legScale;
+      return sum + signedPremium;
     }, 0);
-
-    return premiumSum / Math.max(1, strategy.shares);
   }
 
   private buildPayoffSimulation(
     strategy: CoverageStrategyContract,
     currentPrice: number,
     strike: number,
-    netPremiumPerShare: number,
-    contractScale: number
+    netPremiumPerShare: number
   ) {
     const moves = strategy.targetMovePct !== undefined
       ? [-0.5, -0.35, -0.2, -0.1, -0.05, 0, 0.05, strategy.targetMovePct]
       : [-0.5, -0.35, -0.2, -0.1, -0.05, 0, 0.05, 0.1];
 
-    const points = moves.map((movePct) => this.simulatePoint(strategy, currentPrice, strike, netPremiumPerShare, contractScale, movePct));
-    const breakEvenPrice = currentPrice - this.calculateMaxProtectionPerShare(currentPrice, strike) + netPremiumPerShare;
+    const points = moves.map((movePct) => this.simulatePoint(strategy, currentPrice, strike, netPremiumPerShare, movePct));
+    const breakEvenPrice = currentPrice + netPremiumPerShare;
 
     return {
       baselinePrice: round(currentPrice, 2),
@@ -170,12 +160,11 @@ export class ProtectivePutEngine {
     currentPrice: number,
     strike: number,
     netPremiumPerShare: number,
-    contractScale: number,
     movePct: number
   ): PayoffPoint {
     const scenarioPrice = Math.max(0.01, currentPrice * (1 + movePct));
     const stockPnL = (scenarioPrice - currentPrice) * strategy.shares;
-    const putPayoff = Math.max(0, strike - scenarioPrice) * contractScale;
+    const putPayoff = Math.max(0, strike - scenarioPrice) * strategy.shares;
     const optionCost = netPremiumPerShare * strategy.shares;
     const pnl = stockPnL + putPayoff - optionCost;
 
@@ -216,7 +205,7 @@ export class ProtectivePutEngine {
   ): number {
     const stressPrice = currentPrice * 0.72;
     const stockPnL = (stressPrice - currentPrice) * strategy.shares;
-    const putPayoff = Math.max(0, strike - stressPrice) * this.resolveContractScale(strategy);
+    const putPayoff = Math.max(0, strike - stressPrice) * strategy.shares;
     const optionCost = netPremiumPerShare * strategy.shares;
     return Math.abs(stockPnL + putPayoff - optionCost);
   }
