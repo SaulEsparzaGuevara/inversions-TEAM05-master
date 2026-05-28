@@ -514,6 +514,14 @@ export class InstitutionalTrendEngine {
    * Builds synthetic OHLC candles when real data is not available.
    * Generates at least `slowMaPeriod + 60` candles to ensure MA-200 can be computed.
    */
+  private seededRandom(seed: number): () => number {
+    let s = seed | 0;
+    return () => {
+      s = Math.imul(s, 1664525) + 1013904223 | 0;
+      return (s >>> 0) / 0xffffffff;
+    };
+  }
+
   private buildFallbackCandles(
     analysis: InstitutionalAnalysisContract,
     result: InstitutionalDataServiceResult
@@ -523,18 +531,21 @@ export class InstitutionalTrendEngine {
     const candles: InstitutionalOhlcCandle[] = [];
     const now = Date.now();
 
+    const tickerSeed = analysis.ticker.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const rand = this.seededRandom(tickerSeed);
+
     for (let index = 0; index < totalCandles; index += 1) {
       // Sinusoidal drift to create a realistic price path
       const phase = (index / totalCandles) * Math.PI * 4;
       const drift = Math.sin(phase) * (basePrice * 0.10);
-      const noise = (Math.random() - 0.5) * basePrice * 0.015;
+      const noise = (rand() - 0.5) * basePrice * 0.015;
       const institutionalBias = this.deriveInstitutionalBias(result, index);
 
       const center = basePrice + drift + institutionalBias + noise;
       const open = center + Math.sin(index * 0.3) * basePrice * 0.005;
       const close = center + Math.sin((index + 1) * 0.3) * basePrice * 0.005;
-      const high = Math.max(open, close) + basePrice * 0.006 * (0.5 + Math.random());
-      const low = Math.min(open, close) - basePrice * 0.006 * (0.5 + Math.random());
+      const high = Math.max(open, close) + basePrice * 0.006 * (0.5 + rand());
+      const low = Math.min(open, close) - basePrice * 0.006 * (0.5 + rand());
       const volumeBase = Math.abs(Math.sin(index / 5)) * 150000 + 80000;
 
       candles.push({

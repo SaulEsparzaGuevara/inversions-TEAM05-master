@@ -56,6 +56,8 @@ export interface RiskMetrics {
   upsideCap: number | null;
   breakEvenPrice: number;
   stopLossPrice: number;
+  stopLossLowPrice?: number;
+  stopLossHighPrice?: number;
   marginRequirement: number;
   exerciseRiskScore: number;
   volatilityStressLoss: number;
@@ -203,12 +205,14 @@ function normalCdf(x: number): number {
   if (x < -10) return 0;
   if (x > 10) return 1;
   const k = 1 / (1 + STANDARD_NORMAL_CDF_DIVISOR * Math.abs(x));
-  let cdf = 1 - Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI);
-  cdf *= k * STANDARD_NORMAL_CDF_COEFFICIENTS[0]
+  const pdf = Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI);
+  const cdf = pdf * (
+    k    * STANDARD_NORMAL_CDF_COEFFICIENTS[0]
     + k ** 2 * STANDARD_NORMAL_CDF_COEFFICIENTS[1]
     + k ** 3 * STANDARD_NORMAL_CDF_COEFFICIENTS[2]
     + k ** 4 * STANDARD_NORMAL_CDF_COEFFICIENTS[3]
-    + k ** 5 * STANDARD_NORMAL_CDF_COEFFICIENTS[4];
+    + k ** 5 * STANDARD_NORMAL_CDF_COEFFICIENTS[4]
+  );
   return x >= 0 ? 1 - cdf : cdf;
 }
 

@@ -600,19 +600,26 @@ export class ExpirationAnalysisEngine {
         }
       }
 
-      // Triple Witching (quarterly OpEx months)
+      // Triple Witching (quarterly OpEx months) — same date as quarterly_opex, upgrade significance
       if (TRIPLE_WITCHING_MONTHS.includes(targetMonth)) {
         const tripleWitch = this.findNthWeekday(targetYear, targetMonth, 3, OPEX_WEEKDAY);
         if (tripleWitch > refTime) {
-          const daysUntil = Math.round((tripleWitch - refTime) / DAY_MS);
-          events.push({
-            type: "quarterly_opex",
-            date: tripleWitch,
-            label: `${this.monthLabel(targetMonth)} ${targetYear} Triple Witching`,
-            daysUntil,
-            directionalBias: "neutral",
-            significance: 0.95
-          });
+          const existing = events.find((e) => e.date === tripleWitch && e.type === "quarterly_opex");
+          if (existing) {
+            existing.label = `${this.monthLabel(targetMonth)} ${targetYear} Triple Witching`;
+            existing.significance = 0.95;
+            existing.directionalBias = "neutral";
+          } else {
+            const daysUntil = Math.round((tripleWitch - refTime) / DAY_MS);
+            events.push({
+              type: "quarterly_opex",
+              date: tripleWitch,
+              label: `${this.monthLabel(targetMonth)} ${targetYear} Triple Witching`,
+              daysUntil,
+              directionalBias: "neutral",
+              significance: 0.95
+            });
+          }
         }
       }
     }
@@ -725,9 +732,9 @@ export class ExpirationAnalysisEngine {
           }
       }
 
-      // CPI release: typically 2nd week of the month
+      // CPI release: typically 2nd week of the month (Tuesday, distinct from FOMC Wednesday)
       if (targetMonth > currentMonth || (targetMonth === currentMonth && 0 < referenceDate.getDate())) {
-        const cpiDate = this.findNthWeekday(targetYear, targetMonth, 2, 3); // 2nd Wednesday
+        const cpiDate = this.findNthWeekday(targetYear, targetMonth, 2, 2); // 2nd Tuesday
         if (cpiDate > refTime) {
           const daysUntil = Math.round((cpiDate - refTime) / DAY_MS);
           windows.push({
@@ -1007,11 +1014,12 @@ export class ExpirationAnalysisEngine {
    * Jul/Aug/Sep mixed, Oct/Nov/Dec mixed.)
    */
   private estimateExpiryBias(month: number): "bullish" | "bearish" | "neutral" {
-    // January effect, March OpEx, etc.
-    if (month >= 1 && month <= 3) return "neutral";
-    if (month >= 4 && month <= 6) return "bullish";
-    if (month >= 7 && month <= 9) return "neutral";
-    return "bearish";
+    if (month === 9) return "bearish";           // September: historically the weakest month
+    if (month === 10) return "neutral";          // October: volatile, mixed bias
+    if (month === 11 || month === 12) return "bullish"; // Nov-Dec: Santa rally
+    if (month >= 4 && month <= 6) return "bullish";     // Apr-Jun: spring rally
+    if (month >= 7 && month <= 8) return "neutral";     // Jul-Aug: summer drift
+    return "neutral";                            // Jan-Mar: variable
   }
 
   /**

@@ -58,7 +58,9 @@ export class CollarEngine {
       downsideRisk: round(downsideRisk * strategy.shares, 2),
       upsideCap: round(upsideCap * strategy.shares, 2),
       breakEvenPrice: round(currentPrice + netPremiumPerShare, 2),
-      stopLossPrice: round(Math.min(stopLossLow, stopLossHigh), 2),
+      stopLossPrice: round(stopLossLow, 2),
+      stopLossLowPrice: round(stopLossLow, 2),
+      stopLossHighPrice: round(stopLossHigh, 2),
       marginRequirement: round(strategy.capital * 0.08, 2),
       exerciseRiskScore: round(this.calculateExerciseRisk(currentPrice, putLeg.strike, callLeg.strike), 4),
       volatilityStressLoss: round(this.calculateVolatilityStress(strategy, currentPrice, putLeg.strike, callLeg.strike, netPremiumPerShare), 2)

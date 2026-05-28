@@ -22,7 +22,7 @@ describe("protective put engine", () => {
         }
       ],
       capital: 10_000,
-      riskTolerancePct: 0.3,
+      riskTolerancePct: 0,
       requestedAt: "2026-05-20T00:00:00.000Z"
     });
 
