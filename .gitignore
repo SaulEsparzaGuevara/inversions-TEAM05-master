@@ -3,6 +3,8 @@ dist/
 build/
 *.log
 .env
+.env:Zone.Identifier
+
 
 __pycache__/
 *.pyc
